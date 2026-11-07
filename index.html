@@ -536,7 +536,7 @@ function viewProfile(){
   return `<div class="panel"><div class="row"><label for="pick" style="color:var(--muted)">Select stalker</label>
     ${pickerHtml("pick",names,S.profile,"Type a name to search…")}</div></div>
   <div class="profile">
-   <div class="panel"><h2>Info</h2><dl class="info">${STALKER_FIELDS.filter(f=>f[0]!=="name").map(f=>`<dt>${f[1]}</dt><dd>${f[0]==="status"&&p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:esc(p[f[0]])||'<span style="color:#5f6153">—</span>'}</dd>`).join("")}</dl></div>
+   <div class="panel"><h2>Info</h2><dl class="info">${STALKER_FIELDS.filter(f=>f[0]!=="name").map(f=>`<dt>${f[1]}</dt><dd>${f[0]==="status"&&p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:f[0]==="notes"&&p.notes?notesCell(p.notes):esc(p[f[0]])||'<span style="color:#5f6153">—</span>'}</dd>`).join("")}</dl></div>
    <div class="panel"><h2>Totals</h2><dl class="info">
      <dt>Rubles paid to them</dt><dd class="num">${fmtN(rubOut)}</dd><dt>Rubles they paid us</dt><dd>${fmtN(rubIn)}</dd>
      <dt>Items they brought in</dt><dd>${fmtN(itIn)}</dd><dt>Items given to them</dt><dd>${fmtN(itOut)}</dd><dt>Log entries</dt><dd>${rows.length}</dd></dl></div>
@@ -553,7 +553,7 @@ function viewItem(){
   return `<div class="panel"><div class="row"><label for="pick-item" style="color:var(--muted)">Select item</label>
     ${pickerHtml("pick-item",names,S.itemSel,"Type an item to search…")}</div></div>
   <div class="profile">
-   <div class="panel"><h2>Info</h2><dl class="info"><dt>Category</dt><dd>${esc(it.category)||"—"}</dd><dt>Times logged</dt><dd>${e.count}</dd><dt>Last moved</dt><dd>${last?fmtTs(last.ts):"—"}</dd><dt>Notes</dt><dd>${esc(it.notes)||"—"}</dd></dl></div>
+   <div class="panel"><h2>Info</h2><dl class="info"><dt>Category</dt><dd>${esc(it.category)||"—"}</dd><dt>Times logged</dt><dd>${e.count}</dd><dt>Last moved</dt><dd>${last?fmtTs(last.ts):"—"}</dd><dt>Notes</dt><dd>${it.notes?notesCell(it.notes):"—"}</dd></dl></div>
    <div class="panel"><h2>Stock</h2><dl class="info"><dt><b>In stock (total)</b></dt><dd><b class="${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}" style="font-size:20px">${isRuble(S.itemSel)&&e.total>0?"±":""}${fmtN(e.total)}</b></dd>
      ${stor.map(s=>`<dt>${esc(s)}</dt><dd>${fmtN(e.by[s]||0)}</dd>`).join("")}<dt>Total received</dt><dd>${fmtN(e.rec)}</dd><dt>Total given out</dt><dd>${fmtN(e.out)}</dd></dl></div>
    <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(it.name)}">`:`<div class="photo">No photo</div>`}</div>
