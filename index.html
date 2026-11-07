@@ -105,6 +105,8 @@ dl.info dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .gate .field{margin-bottom:10px}
 .whoami{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted);justify-content:flex-end;width:100%}
 .hidden{display:none!important}
+#rain{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+#app,#gate{position:relative;z-index:1}
 .picker{position:relative;display:inline-block;width:280px;max-width:100%}
 .picker input{padding-right:30px;cursor:pointer}
 .picker input:focus{cursor:text}
@@ -189,6 +191,7 @@ nav.tabs a{position:relative}
 <script src="config.js"></script>
 </head>
 <body>
+<canvas id="rain" aria-hidden="true"></canvas>
 <div class="gate hidden" id="gate"><div class="card" id="gate-card"></div></div>
 <div class="wrap hidden" id="app">
   <header class="top">
@@ -760,11 +763,13 @@ function randomPass(){const a="abcdefghjkmnpqrstuvwxyz23456789",r=crypto.getRand
 function openAccountModal(){
   openModal(`<form id="m-form" autocomplete="off"><h2>Your account</h2>
    <p style="color:var(--muted);margin:0 0 12px">Logged in as <b>${esc(S.me.username)}</b> · role: ${esc(S.me.role)}</p>
+   <label class="row" style="margin:0 0 14px"><input type="checkbox" id="p-rain" style="width:auto" ${Rain.on()?"checked":""}> Matrix rain on the sides of the page</label>
    <div class="grid"><div class="field"><label for="p-cur">Current password</label><input id="p-cur" type="password" autocomplete="current-password" required></div>
    <div class="field"><label for="p-new">New password</label><input id="p-new" type="password" autocomplete="new-password" minlength="6" required></div></div>
    <div class="row" style="margin-top:12px"><button class="btn primary" type="submit">Change password</button><button class="btn" type="button" id="m-cancel">Close</button></div>
    <div class="msg" id="m-msg"></div></form>`);
   $("#m-cancel").onclick=closeModal;
+  $("#p-rain").onchange=e=>Rain.set(e.target.checked);
   $("#m-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#m-msg"),cur=$("#p-cur").value,nw=$("#p-new").value;
     if(nw.length<6){msg.className="msg err";msg.textContent="The new password needs at least 6 characters.";return}
     try{const u=auth.currentUser;await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,cur));await u.updatePassword(nw);
@@ -978,8 +983,8 @@ function startData(){
 }
 
 /* ---------- login gate ---------- */
-function showGate(html){$("#app").classList.add("hidden");$("#gate").classList.remove("hidden");$("#gate-card").innerHTML=html}
-function showApp(){$("#gate").classList.add("hidden");$("#app").classList.remove("hidden")}
+function showGate(html){$("#app").classList.add("hidden");$("#gate").classList.remove("hidden");$("#gate-card").innerHTML=html;Rain.relayout()}
+function showApp(){$("#gate").classList.add("hidden");$("#app").classList.remove("hidden");Rain.relayout()}
 const GATE_HEAD=`<h1>Ecologists Field Database<small>Russo-Belarussian Ecologist Mission · FOB access only</small></h1>`;
 function loginForm(note){
   showGate(`${GATE_HEAD}<p style="margin-top:12px">${note?esc(note):"Log in with the username and password the admin gave you."}</p>
@@ -1061,6 +1066,33 @@ function onUser(user){
     render();
   },err=>loginForm("Couldn't check your access. Try logging in again."));
 }
+/* ---------- Matrix rain in the side margins ---------- */
+const Rain=(()=>{
+  const cv=document.getElementById("rain"),ctx=cv.getContext("2d"),FS=15,CW=17,BG="19,22,15";
+  let cols=[],W=0,H=0,dpr=1,raf=0,last=0,running=false;
+  const reduced=()=>window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const on=()=>{try{return localStorage.getItem("fob-rain")!=="off"}catch(_){return true}};
+  function layout(){dpr=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.fillStyle=`rgb(${BG})`;ctx.fillRect(0,0,W,H);
+    const r=(document.querySelector("#app:not(.hidden)")?document.querySelector("#app"):document.querySelector("#gate .card")||document.body).getBoundingClientRect();
+    const L=Math.max(0,r.left-10),R=Math.min(W,r.right+10);cols=[];
+    for(let x=4;x+CW<=L;x+=CW)cols.push(mk(x));for(let x=Math.ceil((R+4)/CW)*CW;x+CW<=W;x+=CW)cols.push(mk(x))}
+  function mk(x){return {x,y:-Math.random()*H,sp:0.35+Math.random()*0.9,prev:null}}
+  function frame(t){raf=requestAnimationFrame(frame);if(t-last<45)return;last=t;
+    ctx.fillStyle=`rgba(${BG},0.16)`;ctx.fillRect(0,0,W,H);ctx.font=`600 ${FS}px ui-monospace,Consolas,monospace`;ctx.textBaseline="top";
+    for(const c of cols){
+      if(c.prev!=null&&c.y>0){ctx.shadowBlur=0;ctx.fillStyle="rgba(64,220,110,.85)";ctx.fillText(c.prev,c.x,c.y-FS)}
+      const ch=String((Math.random()*10)|0);c.prev=ch;
+      ctx.shadowColor="#5dff8f";ctx.shadowBlur=10;ctx.fillStyle="#d6ffe2";ctx.fillText(ch,c.x,c.y);
+      c.y+=FS*c.sp;if(c.y>H+FS*2&&Math.random()>0.96){c.y=-FS*(2+Math.random()*20);c.sp=0.35+Math.random()*0.9;c.prev=null}}
+    ctx.shadowBlur=0}
+  function start(){if(running||!on()||reduced()||document.hidden)return;layout();if(!cols.length)return;running=true;last=0;raf=requestAnimationFrame(frame)}
+  function stop(clear){cancelAnimationFrame(raf);running=false;if(clear){ctx.clearRect(0,0,W,H)}}
+  let rt=0;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{stop();start()},150)});
+  document.addEventListener("visibilitychange",()=>document.hidden?stop():start());
+  return {on,start,stop,relayout(){if(running){stop();start()}else start()},
+    set(v){try{localStorage.setItem("fob-rain",v?"on":"off")}catch(_){}if(v)start();else stop(true)}};
+})();
 function init(){
   if(typeof firebase==="undefined"){showGate(`${GATE_HEAD}<p style="margin-top:12px;color:var(--bad)">Couldn't load the login system. Check your internet connection and reload.</p>`);return}
   if(typeof FIREBASE_CONFIG==="undefined"||!FIREBASE_CONFIG.apiKey||String(FIREBASE_CONFIG.apiKey).includes("PASTE")){showGate(`${GATE_HEAD}<p style="margin-top:12px;color:var(--bad)">Not set up yet: paste your Firebase settings into <b>config.js</b>.</p>`);return}
