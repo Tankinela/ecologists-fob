@@ -105,6 +105,12 @@ dl.info dd{margin:0}
 .picklist .opt.hi{background:#9cc3f5;color:#10140b}
 .picklist .opt.cur:not(.hi){color:var(--accent)}
 .picklist .none{padding:6px 12px;color:var(--muted)}
+.combolist{position:fixed;z-index:55;max-height:320px;overflow-y:auto;background:var(--panel-2);border:1px solid #4a5638;border-radius:4px;box-shadow:0 10px 28px rgba(0,0,0,.55);padding:2px 0}
+.combolist .opt{padding:4px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.combolist .opt.hi{background:#9cc3f5;color:#10140b}
+.combolist .opt small{color:var(--muted);margin-left:6px}
+.combolist .opt.hi small{color:#2a3320}
+input[data-combo]{background-image:linear-gradient(45deg,transparent 50%,#9c9b86 50%),linear-gradient(135deg,#9c9b86 50%,transparent 50%);background-position:calc(100% - 15px) 55%,calc(100% - 10px) 55%;background-size:5px 5px;background-repeat:no-repeat;padding-right:26px}
 
 nav.tabs a{position:relative}
 .tabdot{position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 2px var(--bg)}
@@ -259,12 +265,12 @@ function datalists(){
 }
 function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:"")+list.map(o=>`<option ${o===sel?"selected":""}>${esc(o)}</option>`).join("")}
 function resetForm(){const f=$("#entry");if(f)f.remove();S.formState=null;delete S.flash["e-msg"]}
-function withFieldHtml(name){return `<div class="field w-field"><label>Stalker</label><div class="row" style="flex-wrap:nowrap"><input class="w-name" list="dl-stalkers" value="${esc(name||"")}" aria-label="Another stalker in this trade"><button class="btn" type="button" data-rmwith aria-label="Remove this stalker" title="Remove this stalker">✕</button></div></div>`}
+function withFieldHtml(name){return `<div class="field w-field"><label>Stalker</label><div class="row" style="flex-wrap:nowrap"><input class="w-name" data-combo="stalkers" value="${esc(name||"")}" aria-label="Another stalker in this trade"><button class="btn" type="button" data-rmwith aria-label="Remove this stalker" title="Remove this stalker">✕</button></div></div>`}
 function blankRow(action){return {action:action||"Received",item:"",quality:"",qty:""}}
 function itemRowHtml(r,i,editing){
   return `<div class="irow">
     <div class="field"><label>Action</label><select class="r-action" aria-label="Action">${opts(L("actions"),r.action||"Received")}</select></div>
-    <div class="field f-item"><label>Item</label><input class="r-item" list="dl-items" value="${esc(r.item||"")}" aria-label="Item"></div>
+    <div class="field f-item"><label>Item</label><input class="r-item" data-combo="items" value="${esc(r.item||"")}" aria-label="Item"></div>
     <div class="field"><label>Quality</label><select class="r-quality" aria-label="Quality">${opts(L("qualities"),r.quality||"","—")}</select></div>
     <div class="field"><label>Qty</label><input class="r-qty" type="number" min="1" step="1" value="${esc(r.qty||"")}" aria-label="Quantity"></div>
     ${editing?"<span></span>":`<button class="btn rm" type="button" data-rmrow aria-label="Remove this item" title="Remove this item">✕</button>`}
@@ -284,11 +290,11 @@ function entryForm(){
   <h2>${editing?"Edit entry":"New trade"}</h2>${datalists()}
   <div class="grid">
     <div class="field"><label for="e-ts">Date &amp; time</label><input id="e-ts" type="datetime-local" value="${toLocalInput(e.ts||Date.now())}"></div>
-    <div class="field"><label for="e-char">Character / source</label><input id="e-char" list="dl-chars" value="${esc(e.character||"")}" required></div>
+    <div class="field"><label for="e-char">Character / source</label><input id="e-char" data-combo="chars" value="${esc(e.character||"")}" required></div>
     <div id="e-withs" style="display:contents">${(e.withs||[]).map(withFieldHtml).join("")}</div>
     <div class="field"><label>&nbsp;</label><button class="btn" type="button" id="e-addwith">+ Add stalker</button></div>
     <div class="field"><label for="e-storage">Storage</label><select id="e-storage">${opts(L("storages"),e.storage||"","—")}</select></div>
-    <div class="field"><label for="e-by">Handled by (FOB)</label><input id="e-by" list="dl-fob" value="${esc(e.handledBy||"")}"></div>
+    <div class="field"><label for="e-by">Handled by (FOB)</label><input id="e-by" data-combo="fob" value="${esc(e.handledBy||"")}"></div>
     <div class="field wide"><label for="e-notes">Notes</label><input id="e-notes" value="${esc(e.notes||"")}"></div>
   </div>
   <div class="irows" id="e-rows">${rows.map((r,i)=>itemRowHtml(r,i,editing)).join("")}</div>
@@ -432,6 +438,46 @@ function viewPeople(kind){
 const viewStalkers=()=>viewPeople("stalkers"),viewFob=()=>viewPeople("fob");
 
 /* ---------- Profiles ---------- */
+/* ---------- combo lists for typed fields ---------- */
+function comboNames(kind){
+  const sortN=a=>a.slice().sort((x,y)=>x.localeCompare(y,undefined,{sensitivity:"base",numeric:true}));
+  if(kind==="items")return sortN(S.items.map(i=>i.name).filter(Boolean)).map(n=>({v:n,sub:categoryOf(n)}));
+  if(kind==="stalkers")return sortN(S.stalkers.map(x=>x.name).filter(Boolean)).map(n=>({v:n}));
+  if(kind==="fob")return sortN(S.fob.map(x=>x.name).filter(Boolean)).map(n=>({v:n,sub:(S.fob.find(f=>f.name===n)||{}).team||""}));
+  if(kind==="chars")return [...L("sources").map(n=>({v:n,sub:"source"})),...sortN(S.stalkers.map(x=>x.name).filter(Boolean)).map(n=>({v:n}))];
+  return []}
+const CB={el:null,list:[],hi:-1};
+function cbFilter(kind,q){const all=comboNames(kind);q=q.trim().toLowerCase();if(!q)return all;
+  const a=all.filter(o=>o.v.toLowerCase().startsWith(q)),b=all.filter(o=>!o.v.toLowerCase().startsWith(q)&&o.v.toLowerCase().includes(q));return a.concat(b)}
+function cbClose(){const l=$("#combo-list");if(l)l.remove();if(CB.el)CB.el.setAttribute("aria-expanded","false");CB.el=null}
+function cbDraw(scrollToHi){let l=$("#combo-list");if(!CB.el)return;
+  if(!CB.list.length){if(l)l.remove();return}
+  if(!l){document.body.insertAdjacentHTML("beforeend",'<div class="combolist" id="combo-list" role="listbox"></div>');l=$("#combo-list");
+    l.addEventListener("mousedown",ev=>{ev.preventDefault();const o=ev.target.closest(".opt");if(o)cbPick(CB.list[+o.dataset.i])});
+    l.addEventListener("mousemove",ev=>{const o=ev.target.closest(".opt");if(o&&+o.dataset.i!==CB.hi){CB.hi=+o.dataset.i;l.querySelectorAll(".opt").forEach(x=>x.classList.toggle("hi",+x.dataset.i===CB.hi))}})}
+  const r=CB.el.getBoundingClientRect();l.style.left=r.left+"px";l.style.width=Math.max(r.width,220)+"px";
+  const below=window.innerHeight-r.bottom-8,above=r.top-8,h=Math.min(320,CB.list.length*29+6);
+  if(below<h&&above>below){l.style.top="";l.style.bottom=(window.innerHeight-r.top+2)+"px";l.style.maxHeight=Math.min(320,above)+"px"}
+  else{l.style.bottom="";l.style.top=(r.bottom+2)+"px";l.style.maxHeight=Math.min(320,Math.max(120,below))+"px"}
+  l.innerHTML=CB.list.slice(0,300).map((o,i)=>`<div class="opt${i===CB.hi?" hi":""}" data-i="${i}" role="option">${esc(o.v)}${o.sub?`<small>${esc(o.sub)}</small>`:""}</div>`).join("");
+  const h2=l.querySelector(".hi");if(h2&&scrollToHi){const t=h2.offsetTop,b=t+h2.offsetHeight;if(t<l.scrollTop)l.scrollTop=t;else if(b>l.scrollTop+l.clientHeight)l.scrollTop=b-l.clientHeight}}
+function cbOpen(el,q){CB.el=el;el.setAttribute("aria-expanded","true");CB.list=cbFilter(el.dataset.combo,q);
+  CB.hi=q.trim()?0:CB.list.findIndex(o=>o.v===el.value);cbDraw(true);
+  if(!q.trim()&&CB.hi>=0){const l=$("#combo-list"),h=l&&l.querySelector(".hi");if(h)l.scrollTop=Math.max(0,h.offsetTop-l.clientHeight/2)}}
+function cbPick(o){const el=CB.el;if(!el||!o)return;el.value=o.v;cbClose();el.dispatchEvent(new Event("change",{bubbles:true}));
+  const f=el.closest("form");if(f){const ins=[...f.querySelectorAll("input,select,textarea,button")].filter(x=>!x.disabled&&x.offsetParent!==null&&x.type!=="hidden"&&!x.matches("[data-rmrow],[data-rmwith]"));const i=ins.indexOf(el);if(i>=0&&ins[i+1])ins[i+1].focus()}}
+document.addEventListener("focusin",ev=>{const el=ev.target;if(el.matches&&el.matches("input[data-combo]")){el.setAttribute("role","combobox");el.setAttribute("autocomplete","off");cbOpen(el,"")}});
+document.addEventListener("mousedown",ev=>{const el=ev.target;if(el.matches&&el.matches("input[data-combo]")&&document.activeElement===el&&!$("#combo-list"))cbOpen(el,"")});
+document.addEventListener("input",ev=>{const el=ev.target;if(el.matches&&el.matches("input[data-combo]"))cbOpen(el,el.value)});
+document.addEventListener("focusout",ev=>{if(ev.target===CB.el)setTimeout(()=>{if(document.activeElement!==CB.el)cbClose()},100)});
+document.addEventListener("keydown",ev=>{const el=ev.target;if(!(el.matches&&el.matches("input[data-combo]")))return;
+  const open=!!$("#combo-list")&&CB.el===el;
+  if(ev.key==="ArrowDown"){ev.preventDefault();if(!open){cbOpen(el,"");return}CB.hi=Math.min(CB.list.length-1,CB.hi+1);cbDraw(true)}
+  else if(ev.key==="ArrowUp"&&open){ev.preventDefault();CB.hi=Math.max(0,CB.hi-1);cbDraw(true)}
+  else if((ev.key==="Enter"||ev.key==="Tab")&&open&&CB.hi>=0&&CB.list[CB.hi]){ev.preventDefault();cbPick(CB.list[CB.hi])}
+  else if(ev.key==="Escape"&&open){ev.preventDefault();ev.stopPropagation();cbClose()}},true);
+window.addEventListener("scroll",ev=>{if(CB.el&&!(ev.target&&ev.target.id==="combo-list"))cbDraw(false)},true);
+window.addEventListener("resize",()=>{if(CB.el)cbDraw(false)});
 function pickerHtml(id,names,cur,ph){
   return `<div class="picker" id="${id}-wrap" data-names="${esc(JSON.stringify(names))}">
    <input id="${id}" value="${esc(cur)}" placeholder="${esc(ph)}" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="${id}-list" aria-label="${esc(ph)}">
@@ -620,7 +666,7 @@ function viewAccounts(){
    <div class="grid">
     <div class="field"><label for="a-user">Username</label><input id="a-user" required autocomplete="off"></div>
     <div class="field"><label for="a-pass">Password</label><input id="a-pass" type="text" required minlength="6" autocomplete="new-password"></div>
-    <div class="field"><label for="a-char">Character name (fills "Handled by")</label><input id="a-char" list="dl-fob2"><datalist id="dl-fob2">${S.fob.slice().sort(byName).map(f=>`<option value="${esc(f.name)}">`).join("")}</datalist></div>
+    <div class="field"><label for="a-char">Character name (fills "Handled by")</label><input id="a-char" data-combo="fob"><datalist id="dl-fob2">${S.fob.slice().sort(byName).map(f=>`<option value="${esc(f.name)}">`).join("")}</datalist></div>
     <div class="field"><label for="a-role">Role</label><select id="a-role">${ROLES.map(([k,l])=>`<option value="${k}" ${k==="member"?"selected":""}>${l}</option>`).join("")}</select></div>
    </div>
    <div class="row" style="margin-top:10px"><button class="btn primary" type="submit">Create account</button><button class="btn" type="button" id="a-gen">Random password</button></div>
@@ -628,7 +674,7 @@ function viewAccounts(){
   <div class="panel"><h2>Accounts</h2>
    <div class="tablewrap"><table><thead><tr><th>Username</th><th>Character</th><th>Role</th><th>Access</th><th>Created</th></tr></thead><tbody>
    ${rows.map(m=>{const self=S.me&&m.id===S.me.id;return`<tr><td><b>${esc(m.username)}</b>${self?' <span class="badge">you</span>':""}</td>
-    <td>${self?esc(m.character):`<input data-mchar="${m.id}" value="${esc(m.character)}" style="width:200px" list="dl-fob2">`}</td>
+    <td>${self?esc(m.character):`<input data-mchar="${m.id}" value="${esc(m.character)}" style="width:200px" data-combo="fob">`}</td>
     <td>${self?esc(m.role):`<select data-mrole="${m.id}" style="width:auto">${ROLES.map(([k])=>`<option ${k===m.role?"selected":""}>${k}</option>`).join("")}</select>`}</td>
     <td>${self?'<span class="chip in">Active</span>':`<button class="btn small ${m.active?"danger":""}" data-mactive="${m.id}">${m.active?"Lock out":"Let back in"}</button> ${m.active?'<span class="chip in">Active</span>':`<span class="chip out">Locked out</span> <button class="btn small danger" data-mremove="${m.id}">Remove</button>`}`}</td>
     <td>${m.created?fmtDay(m.created):""}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No accounts yet.</td></tr>`}
