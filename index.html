@@ -682,7 +682,7 @@ function viewAccounts(){
    <p style="color:var(--muted);font-size:13px;margin:10px 0 0"><b>Forgot password?</b> 1) Firebase console → Authentication → Users → find <i>username@fob.local</i> → ⋮ → Delete account. 2) Here: Lock out → Remove. 3) Create the same username again with a new password. Anyone can change their own password under <i>Account</i> at the top.</p>
    <div class="msg" id="acc-msg"></div></div>
   <form class="panel" id="imp"><h2>Import data</h2>
-   <p style="color:var(--muted);margin:0 0 12px">Load the <i>ecologists-data.json</i> file once to copy over everything from the old site. Running it again only overwrites those same entries; it never deletes anything.</p>
+   <p style="color:var(--muted);margin:0 0 12px">Load an import file (for example <i>ecologists-data.json</i> or a stalker list). Names that already exist are skipped, running it twice only overwrites the same entries, and it never deletes anything.</p>
    <div class="row"><input type="file" id="imp-file" accept=".json,application/json" style="width:auto"><button class="btn primary" type="submit">Import</button></div>
    <div class="msg" id="imp-msg"></div></form>`;
 }
@@ -708,10 +708,13 @@ async function runImport(){
   if(!f){setMsg("imp-msg","err","Pick the ecologists-data.json file first.");return}
   let data;try{data=JSON.parse(await f.text())}catch(_){setMsg("imp-msg","err","That file isn't valid JSON.");return}
   if(!data||data.format!=="ecologists-fob-seed-1"||!Array.isArray(data.docs)){setMsg("imp-msg","err","That isn't the Ecologists data file.");return}
-  const ok=new Set(["log","items","stalkers","fob","config"]),docs=data.docs.filter(d=>d&&typeof d.path==="string"&&ok.has(d.path.split("/")[0])&&d.path.split("/").length===2);
+  const ok=new Set(["log","items","stalkers","fob","config"]);let docs=data.docs.filter(d=>d&&typeof d.path==="string"&&ok.has(d.path.split("/")[0])&&d.path.split("/").length===2);
+  const have={items:S.items,stalkers:S.stalkers,fob:S.fob};let dupes=0;
+  docs=docs.filter(d=>{const [col,id]=d.path.split("/");const list=have[col];if(!list||!d.data||!d.data.name)return true;
+    const same=list.find(x=>(x.name||"").trim().toLowerCase()===String(d.data.name).trim().toLowerCase());if(same&&same.id!==id){dupes++;return false}return true});
   const b0=$("#imp button");b0.disabled=true;
   try{for(let i=0;i<docs.length;i+=200){const b=db.batch();for(const d of docs.slice(i,i+200))b.set(db.doc(d.path),d.data);await b.commit();setMsg("imp-msg","",`Imported ${Math.min(i+200,docs.length)} of ${docs.length}…`)}
-    setMsg("imp-msg","ok",`Done — imported ${docs.length} records.`)}
+    setMsg("imp-msg","ok",`Done — imported ${docs.length} records.`+(dupes?` Skipped ${dupes} that were already in the database.`:""))}
   catch(e){setMsg("imp-msg","err",errText(e))}
   b0.disabled=false;
 }
