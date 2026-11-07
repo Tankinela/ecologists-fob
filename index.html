@@ -241,7 +241,7 @@ function renderTabs(){const cur=route(),n=chatUnread();
 function renderKpis(){
   const {st}=stockTable();let rub=0,items=0,kinds=0;
   for(const e of st.values()){if(isRuble(e.name))rub=e.total;else if(e.total>0){items+=e.total;kinds++}}
-  $("#kpis").innerHTML=`<div class="kpi"><b>${fmtN(rub)}</b><span>Rubles in storage</span></div>
+  $("#kpis").innerHTML=`<div class="kpi" title="Estimate: rubles aren't counted exactly, so this is only roughly right."><b>±${fmtN(rub)}</b><span>Rubles in storage (estimate)</span></div>
   <div class="kpi"><b>${fmtN(items)}</b><span>Items in storage (${kinds} kinds)</span></div>
   <div class="kpi"><b>${fmtN(S.log.length)}</b><span>Log entries</span></div>`;
 }
@@ -384,14 +384,14 @@ function viewStock(){
   const {st,stor}=stockTable(),m=itemMap(),f=S.f,q=f.q.toLowerCase();
   let rows=[...st.values()].filter(e=>(!f.onlyStock||e.total!==0)&&(!f.cat||categoryOf(e.name,m)===f.cat)&&(!q||e.name.toLowerCase().includes(q)));
   rows.sort(byName);
-  const cell=n=>`<td class="num ${n>0?"stock-pos":n<0?"stock-neg":"stock-zero"}">${fmtN(n)}</td>`;
+  let est=false;const cell=n=>`<td class="num ${n>0?"stock-pos":n<0?"stock-neg":"stock-zero"}">${est&&n>0?"±":""}${fmtN(n)}</td>`;
   return `<div class="toolbar">
     <input id="f-q" type="search" placeholder="Search items…" value="${esc(f.q)}" aria-label="Search items">
     <select id="f-cat" aria-label="Category">${opts(L("categories"),f.cat,"All categories")}</select>
     <label class="row"><input type="checkbox" id="f-only" style="width:auto" ${f.onlyStock?"checked":""}> Only items we have</label>
   </div>
   <div class="tablewrap"><table><thead><tr><th></th><th>Item</th><th>Category</th>${stor.map(s=>`<th class="num">${esc(s)}</th>`).join("")}<th class="num">In stock</th><th class="num">Received</th><th class="num">Given out</th></tr></thead><tbody>
-  ${rows.map(e=>{const it=m.get(e.name.toLowerCase());return`<tr><td>${thumb(it)}</td><td><button class="link" data-item="${esc(e.name)}">${esc(e.name)}</button></td><td style="color:var(--muted)">${esc(categoryOf(e.name,m))}</td>
+  ${rows.map(e=>{const it=m.get(e.name.toLowerCase());est=isRuble(e.name);return`<tr><td>${thumb(it)}</td><td><button class="link" data-item="${esc(e.name)}">${esc(e.name)}</button></td><td style="color:var(--muted)">${esc(categoryOf(e.name,m))}</td>
     ${stor.map(s=>cell(e.by[s]||0)).join("")}${cell(e.total)}<td class="num">${fmtN(e.rec)}</td><td class="num">${fmtN(e.out)}</td></tr>`}).join("")||`<tr><td colspan="9" class="empty">Nothing matches.</td></tr>`}
   </tbody></table></div>`;
 }
@@ -541,7 +541,7 @@ function viewItem(){
     ${pickerHtml("pick-item",names,S.itemSel,"Type an item to search…")}</div></div>
   <div class="profile">
    <div class="panel"><h2>Info</h2><dl class="info"><dt>Category</dt><dd>${esc(it.category)||"—"}</dd><dt>Times logged</dt><dd>${e.count}</dd><dt>Last moved</dt><dd>${last?fmtTs(last.ts):"—"}</dd><dt>Notes</dt><dd>${esc(it.notes)||"—"}</dd></dl></div>
-   <div class="panel"><h2>Stock</h2><dl class="info"><dt><b>In stock (total)</b></dt><dd><b class="${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}" style="font-size:20px">${fmtN(e.total)}</b></dd>
+   <div class="panel"><h2>Stock</h2><dl class="info"><dt><b>In stock (total)</b></dt><dd><b class="${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}" style="font-size:20px">${isRuble(S.itemSel)&&e.total>0?"±":""}${fmtN(e.total)}</b></dd>
      ${stor.map(s=>`<dt>${esc(s)}</dt><dd>${fmtN(e.by[s]||0)}</dd>`).join("")}<dt>Total received</dt><dd>${fmtN(e.rec)}</dd><dt>Total given out</dt><dd>${fmtN(e.out)}</dd></dl></div>
    <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(it.name)}">`:`<div class="photo">No photo</div>`}</div>
   </div>
