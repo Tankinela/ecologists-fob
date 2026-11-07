@@ -170,6 +170,9 @@ function stockTable(){
   for(const e of st.values())e.total=e.rec-e.out;
   return {st,stor};
 }
+const withList=r=>(r.with||"").split(",").map(x=>x.trim()).filter(Boolean);
+const people=r=>[r.character,...withList(r)].filter(Boolean);
+const involves=(r,name)=>people(r).includes(name);
 function isRuble(n){return (n||"").toLowerCase()==="ruble"}
 
 /* ---------- render shell ---------- */
@@ -204,6 +207,7 @@ function datalists(){
 }
 function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:"")+list.map(o=>`<option ${o===sel?"selected":""}>${esc(o)}</option>`).join("")}
 function resetForm(){const f=$("#entry");if(f)f.remove();S.formState=null;delete S.flash["e-msg"]}
+function withFieldHtml(name){return `<div class="field w-field"><label>Stalker</label><div class="row" style="flex-wrap:nowrap"><input class="w-name" list="dl-stalkers" value="${esc(name||"")}" aria-label="Another stalker in this trade"><button class="btn" type="button" data-rmwith aria-label="Remove this stalker" title="Remove this stalker">✕</button></div></div>`}
 function blankRow(action){return {action:action||"Received",item:"",quality:"",qty:""}}
 function itemRowHtml(r,i,editing){
   return `<div class="irow">
@@ -213,10 +217,10 @@ function itemRowHtml(r,i,editing){
     <div class="field"><label>Qty</label><input class="r-qty" type="number" min="1" step="1" value="${esc(r.qty||"")}" aria-label="Quantity"></div>
     ${editing?"<span></span>":`<button class="btn rm" type="button" data-rmrow aria-label="Remove this item" title="Remove this item">✕</button>`}
   </div>`}
-function formFromEdit(e){return {ts:e.ts,character:e.character,with:e.with,storage:e.storage,handledBy:e.handledBy,notes:e.notes,rows:[{action:e.action,item:e.item,quality:e.quality,qty:e.qty}]}}
+function formFromEdit(e){return {ts:e.ts,character:e.character,withs:withList(e),storage:e.storage,handledBy:e.handledBy,notes:e.notes,rows:[{action:e.action,item:e.item,quality:e.quality,qty:e.qty}]}}
 function captureForm(){
   if(!$("#entry"))return;const v=id=>($("#"+id)||{}).value||"";const ts=new Date(v("e-ts")).getTime();
-  S.formState={ts:isNaN(ts)?Date.now():ts,character:v("e-char"),with:v("e-with"),storage:v("e-storage"),handledBy:v("e-by"),notes:v("e-notes"),
+  S.formState={ts:isNaN(ts)?Date.now():ts,character:v("e-char"),withs:[...document.querySelectorAll("#e-withs .w-name")].map(x=>x.value),storage:v("e-storage"),handledBy:v("e-by"),notes:v("e-notes"),
     rows:[...document.querySelectorAll("#e-rows .irow")].map(r=>({action:r.querySelector(".r-action").value,item:r.querySelector(".r-item").value,quality:r.querySelector(".r-quality").value,qty:r.querySelector(".r-qty").value}))};
 }
 function entryForm(){
@@ -229,7 +233,8 @@ function entryForm(){
   <div class="grid">
     <div class="field"><label for="e-ts">Date &amp; time</label><input id="e-ts" type="datetime-local" value="${toLocalInput(e.ts||Date.now())}"></div>
     <div class="field"><label for="e-char">Character / source</label><input id="e-char" list="dl-chars" value="${esc(e.character||"")}" required></div>
-    <div class="field"><label for="e-with">With (2nd stalker)</label><input id="e-with" list="dl-stalkers" value="${esc(e.with||"")}"></div>
+    <div id="e-withs" style="display:contents">${(e.withs||[]).map(withFieldHtml).join("")}</div>
+    <div class="field"><label>&nbsp;</label><button class="btn" type="button" id="e-addwith">+ Add stalker</button></div>
     <div class="field"><label for="e-storage">Storage</label><select id="e-storage">${opts(L("storages"),e.storage||"","—")}</select></div>
     <div class="field"><label for="e-by">Handled by (FOB)</label><input id="e-by" list="dl-fob" value="${esc(e.handledBy||"")}"></div>
     <div class="field wide"><label for="e-notes">Notes</label><input id="e-notes" value="${esc(e.notes||"")}"></div>
@@ -258,8 +263,7 @@ function logRows(){
 function rowHtml(r,m){
   const cat=categoryOf(r.item,m),act=r.action==="Received"?"in":"out";
   return `<tr>
-  <td>${fmtTs(r.ts)}</td><td><button class="link" data-prof="${esc(r.character)}">${esc(r.character)}</button></td>
-  <td>${r.with?`<button class="link" data-prof="${esc(r.with)}">${esc(r.with)}</button>`:""}</td>
+  <td>${fmtTs(r.ts)}</td><td style="white-space:normal;min-width:140px">${people(r).map(n=>`<button class="link" data-prof="${esc(n)}">${esc(n)}</button>`).join(", ")}</td>
   <td><span class="chip ${act}">${esc(r.action)}</span></td>
   <td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>
   <td>${r.quality?`<span class="q-${esc(r.quality)}">${esc(r.quality)}</span>`:""}</td>
@@ -275,7 +279,7 @@ function logList(out,m){
   let body="";
   for(const o of out){
     if(o.group){const open=S.openGroups.has(o.key),tot=o.rows.reduce((s,r)=>s+(Number(r.qty)||0),0);
-      body+=`<tr class="group" data-group="${o.key}"><td colspan="12"><span class="chev">${open?"▾":"▸"}</span> ${fmtTs(o.rows[0].ts)} · Chest check · ${o.rows.length} items (${fmtN(tot)} pcs) · ${esc(o.rows[0].storage||"")} — ${open?"click to fold":"click to open"}</td></tr>`;
+      body+=`<tr class="group" data-group="${o.key}"><td colspan="11"><span class="chev">${open?"▾":"▸"}</span> ${fmtTs(o.rows[0].ts)} · Chest check · ${o.rows.length} items (${fmtN(tot)} pcs) · ${esc(o.rows[0].storage||"")} — ${open?"click to fold":"click to open"}</td></tr>`;
       if(open)body+=o.rows.slice().sort((a,b)=>(a.item||"").localeCompare(b.item||"",undefined,{numeric:true})).map(r=>rowHtml(r,m)).join("");}
     else body+=rowHtml(o,m);
   }
@@ -284,8 +288,8 @@ function logList(out,m){
     <select id="f-storage" aria-label="Storage">${opts(L("storages"),S.f.storage,"All storages")}</select>
     <select id="f-action" aria-label="Action">${opts(L("actions"),S.f.action,"All actions")}</select>
   </div>
-  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Character</th><th>With</th><th>Action</th><th>Item</th><th>Quality</th><th>Category</th><th class="num">Qty</th><th>Storage</th><th>Handled by</th><th>Notes</th><th></th></tr></thead>
-  <tbody>${body||`<tr><td colspan="12" class="empty">${S.ready.log?"No entries match.":"Loading entries…"}</td></tr>`}</tbody></table></div>`;
+  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Stalkers</th><th>Action</th><th>Item</th><th>Quality</th><th>Category</th><th class="num">Qty</th><th>Storage</th><th>Handled by</th><th>Notes</th><th></th></tr></thead>
+  <tbody>${body||`<tr><td colspan="11" class="empty">${S.ready.log?"No entries match.":"Loading entries…"}</td></tr>`}</tbody></table></div>`;
 }
 async function saveEntry(){
   captureForm();const f=S.formState,msg=$("#e-msg");msg.className="msg";
@@ -297,7 +301,8 @@ async function saveEntry(){
   const m=itemMap(),missing=rows.find(r=>!m.get(r.item.toLowerCase()));
   if(missing){msg.className="msg err";msg.innerHTML=`“${esc(missing.item)}” is not in the item list. <button class="btn small" type="button" id="e-additem">Add it to Items</button>`;
     $("#e-additem").onclick=()=>openItemModal(null,missing.item);return}
-  const base={ts:f.ts,character:f.character.trim(),with:f.with.trim(),storage:f.storage,handledBy:f.handledBy.trim(),notes:f.notes.trim()};
+  const withs=[...new Set(f.withs.map(x=>x.trim()).filter(x=>x&&x!==f.character.trim()))];
+  const base={ts:f.ts,character:f.character.trim(),with:withs.join(", "),storage:f.storage,handledBy:f.handledBy.trim(),notes:f.notes.trim()};
   const docs=rows.map(r=>({...base,action:r.action,item:m.get(r.item.toLowerCase()).name,quality:r.quality,qty:r.qty}));
   const btns=[...document.querySelectorAll("#entry button")];btns.forEach(b=>b.disabled=true);
   try{
@@ -354,7 +359,7 @@ function viewItems(){
 /* ---------- People ---------- */
 const STALKER_FIELDS=[["name","Name"],["callsign","Callsign"],["player","Player (Discord)"],["faction","Faction","factions"],["rank","Rank"],["status","Status","statuses"],["lastSeen","Last seen (date)"],["location","Last known location"],["notes","Notes / background","",true]];
 const FOB_FIELDS=[["name","Name"],["callsign","Callsign"],["player","Player (Discord)"],["rank","Rank","ranks"],["team","Team","teams"],["status","Status","statuses"],["lastSeen","Last seen (date)"],["location","Last known location"],["notes","Notes / background","",true]];
-function countFor(name,field){let n=0;for(const r of S.log){if(field==="handledBy"?r.handledBy===name:(r.character===name||r.with===name))n++}return n}
+function countFor(name,field){let n=0;for(const r of S.log){if(field==="handledBy"?r.handledBy===name:involves(r,name))n++}return n}
 function viewPeople(kind){
   const list=kind==="fob"?S.fob:S.stalkers,q=S.f.q.toLowerCase();
   const rows=list.filter(p=>!q||[p.name,p.callsign,p.player,p.notes].some(x=>(x||"").toLowerCase().includes(q))).sort(byName);
@@ -384,7 +389,7 @@ function viewProfile(){
   const names=[...L("sources"),...S.stalkers.map(s=>s.name).sort((a,b)=>a.localeCompare(b))];
   if(!S.profile){const recent=S.log.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).find(r=>!L("sources").includes(r.character));S.profile=recent?recent.character:(names[L("sources").length]||names[0]||"")}
   const p=S.stalkers.find(s=>s.name===S.profile)||{name:S.profile};
-  const rows=S.log.filter(r=>r.character===S.profile||r.with===S.profile).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const rows=S.log.filter(r=>involves(r,S.profile)).sort((a,b)=>(b.ts||0)-(a.ts||0));
   let rubOut=0,rubIn=0,itIn=0,itOut=0;
   for(const r of rows){const q=Number(r.qty)||0,rub=isRuble(r.item);
     if(r.action==="Given out"){rub?rubOut+=q:itOut+=q}else{rub?rubIn+=q:itIn+=q}}
@@ -398,7 +403,7 @@ function viewProfile(){
      <dt>Items they brought in</dt><dd>${fmtN(itIn)}</dd><dt>Items given to them</dt><dd>${fmtN(itOut)}</dd><dt>Log entries</dt><dd>${rows.length}</dd></dl></div>
    <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(p.name)}">`:`<div class="photo">No photo</div>`}</div>
   </div>
-  <div class="panel"><h2>Trade history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Item",r=>`<td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>`],["Category",(r,m)=>`<td style="color:var(--muted)">${esc(categoryOf(r.item,m))}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["With",r=>`<td>${esc(r.character===S.profile?r.with:r.character)}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
+  <div class="panel"><h2>Trade history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Item",r=>`<td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>`],["Category",(r,m)=>`<td style="color:var(--muted)">${esc(categoryOf(r.item,m))}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["With",r=>`<td style="white-space:normal">${esc(people(r).filter(n=>n!==S.profile).join(", "))}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
 }
 function viewItem(){
   const names=S.items.map(i=>i.name).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
@@ -608,6 +613,8 @@ function bindView(v){
   if(form){form.onsubmit=ev=>{ev.preventDefault();saveEntry()};
     $("#e-cancel")&&($("#e-cancel").onclick=()=>{S.edit=null;resetForm();render()});
     $("#e-clear")&&($("#e-clear").onclick=()=>{resetForm();render()});
+    $("#e-addwith").onclick=()=>{$("#e-withs").insertAdjacentHTML("beforeend",withFieldHtml(""));const n=document.querySelectorAll("#e-withs .w-name");n[n.length-1].focus()};
+    form.addEventListener("click",ev=>{const b=ev.target.closest("[data-rmwith]");if(b)b.closest(".w-field").remove()});
     $("#e-addrow")&&($("#e-addrow").onclick=()=>{const rs=document.querySelectorAll("#e-rows .irow"),last=rs[rs.length-1];
       $("#e-rows").insertAdjacentHTML("beforeend",itemRowHtml(blankRow(last?last.querySelector(".r-action").value:"Received"),rs.length,false));
       const n=document.querySelectorAll("#e-rows .r-item");n[n.length-1].focus()});
