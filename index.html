@@ -734,7 +734,7 @@ async function runImport(){
   docs=docs.filter(d=>{const [col,id]=d.path.split("/");const list=have[col];if(!list||!d.data||!d.data.name)return true;
     const same=list.find(x=>(x.name||"").trim().toLowerCase()===String(d.data.name).trim().toLowerCase());if(same&&same.id!==id){dupes++;return false}return true});
   const b0=$("#imp button");b0.disabled=true;
-  try{for(let i=0;i<docs.length;i+=200){const b=db.batch();for(const d of docs.slice(i,i+200))b.set(db.doc(d.path),d.data);await b.commit();setMsg("imp-msg","",`Imported ${Math.min(i+200,docs.length)} of ${docs.length}…`)}
+  try{for(let i=0;i<docs.length;i+=200){const b=db.batch();for(const d of docs.slice(i,i+200)){if(d.merge)b.set(db.doc(d.path),d.data,{merge:true});else b.set(db.doc(d.path),d.data)}await b.commit();setMsg("imp-msg","",`Imported ${Math.min(i+200,docs.length)} of ${docs.length}…`)}
     setMsg("imp-msg","ok",`Done — imported ${docs.length} records.`+(dupes?` Skipped ${dupes} that were already in the database.`:""))}
   catch(e){setMsg("imp-msg","err",errText(e))}
   b0.disabled=false;
