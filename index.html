@@ -932,7 +932,7 @@ document.addEventListener("click",async e=>{
   if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Delete?";return}
   t.disabled=true;try{await db.collection("chat").doc(t.dataset.delmsg).delete()}catch(err){t.disabled=false;setMsg("chat-msg","err",errText(err))}
 });
-window.addEventListener("hashchange",()=>{S.flash={};closeEmoji();S.chatDivider=null;clearTimeout(chatFadeTimer);chatFadeTimer=null;S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
+window.addEventListener("hashchange",()=>{S.flash={};openNotes.clear();closeEmoji();S.chatDivider=null;clearTimeout(chatFadeTimer);chatFadeTimer=null;S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
 
 /* ---------- data ---------- */
 let renderQueued=false;
