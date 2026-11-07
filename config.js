@@ -1,10 +1,8 @@
-// Paste your Firebase web app settings here (Firebase console → Project settings → Your apps → Config).
-// These values are meant to be public; the database rules are what keep the data private.
 const FIREBASE_CONFIG = {
-  apiKey: "PASTE_API_KEY",
-  authDomain: "PASTE_PROJECT_ID.firebaseapp.com",
-  projectId: "PASTE_PROJECT_ID",
-  storageBucket: "PASTE_PROJECT_ID.appspot.com",
-  messagingSenderId: "PASTE",
-  appId: "PASTE"
+  apiKey: "AIzaSyAJhGD6xH7YXIf9OViIfcnbW1m59LxLdsk",
+  authDomain: "ecologists-fob.firebaseapp.com",
+  projectId: "ecologists-fob",
+  storageBucket: "ecologists-fob.firebasestorage.app",
+  messagingSenderId: "1061002466087",
+  appId: "1:1061002466087:web:a8bff70915c1dd26200f02"
 };
