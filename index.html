@@ -79,7 +79,8 @@ td.notes{color:var(--muted);max-width:340px;min-width:180px;white-space:normal}
 @media (max-width:820px){.profile{grid-template-columns:1fr}}
 dl.info{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
 dl.info dt{color:var(--muted);font-size:13px}
-dl.info dd{margin:0}
+dl.info dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+#modal textarea{min-height:140px}
 .photo{width:100%;aspect-ratio:1;border-radius:8px;background:#34352e;object-fit:contain;display:grid;place-items:center;color:#6a6b5c}
 .empty{padding:28px;text-align:center;color:var(--muted)}
 .overlay{position:fixed;inset:0;background:rgba(5,7,3,.72);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:20}
