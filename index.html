@@ -409,10 +409,10 @@ function viewAccounts(){
    ${rows.map(m=>{const self=S.me&&m.id===S.me.id;return`<tr><td><b>${esc(m.username)}</b>${self?' <span class="badge">you</span>':""}</td>
     <td>${self?esc(m.character):`<input data-mchar="${m.id}" value="${esc(m.character)}" style="width:200px" list="dl-fob2">`}</td>
     <td>${self?esc(m.role):`<select data-mrole="${m.id}" style="width:auto">${ROLES.map(([k])=>`<option ${k===m.role?"selected":""}>${k}</option>`).join("")}</select>`}</td>
-    <td>${self?'<span class="chip in">Active</span>':`<button class="btn small ${m.active?"danger":""}" data-mactive="${m.id}">${m.active?"Lock out":"Let back in"}</button> ${m.active?'<span class="chip in">Active</span>':'<span class="chip out">Locked out</span>'}`}</td>
+    <td>${self?'<span class="chip in">Active</span>':`<button class="btn small ${m.active?"danger":""}" data-mactive="${m.id}">${m.active?"Lock out":"Let back in"}</button> ${m.active?'<span class="chip in">Active</span>':`<span class="chip out">Locked out</span> <button class="btn small danger" data-mremove="${m.id}">Remove</button>`}`}</td>
     <td>${m.created?fmtDay(m.created):""}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No accounts yet.</td></tr>`}
    </tbody></table></div>
-   <p style="color:var(--muted);font-size:13px;margin:10px 0 0"><b>Forgot password?</b> Lock out the old account and make a new one with a slightly different username (for example <i>stryker2</i>). Anyone can change their own password under <i>Account</i> at the top.</p>
+   <p style="color:var(--muted);font-size:13px;margin:10px 0 0"><b>Forgot password?</b> 1) Firebase console → Authentication → Users → find <i>username@fob.local</i> → ⋮ → Delete account. 2) Here: Lock out → Remove. 3) Create the same username again with a new password. Anyone can change their own password under <i>Account</i> at the top.</p>
    <div class="msg" id="acc-msg"></div></div>
   <form class="panel" id="imp"><h2>Import data</h2>
    <p style="color:var(--muted);margin:0 0 12px">Load the <i>ecologists-data.json</i> file once to copy over everything from the old site. Running it again only overwrites those same entries; it never deletes anything.</p>
@@ -568,6 +568,11 @@ document.addEventListener("click",async e=>{
   const t=e.target.closest("[data-mactive]");if(!t)return;const m=S.members.find(x=>x.id===t.dataset.mactive);if(!m)return;
   if(m.active&&t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Sure? Click again";return}
   t.disabled=true;try{await db.collection("members").doc(m.id).update({active:!m.active})}catch(err){t.disabled=false;setMsg("acc-msg","err",errText(err))}
+});
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-mremove]");if(!t)return;const m=S.members.find(x=>x.id===t.dataset.mremove);if(!m)return;
+  if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Sure? Click again";return}
+  t.disabled=true;try{await db.collection("members").doc(m.id).delete();setMsg("acc-msg","ok",`Removed ${m.username}. If you also deleted them in Firebase, you can now create "${m.username}" again with a new password.`)}catch(err){t.disabled=false;setMsg("acc-msg","err",errText(err))}
 });
 document.addEventListener("change",async e=>{
   const t=e.target;const id=t.dataset&&(t.dataset.mrole||t.dataset.mchar);if(!id)return;
