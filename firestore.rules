@@ -43,10 +43,11 @@ service cloud.firestore {
     match /fob/{id}      { allow read: if isMember(); allow write: if canWrite(); }
     match /config/{id}   { allow read: if isMember(); allow write: if canWrite(); }
 
-    // FOB chat: every active account can read and post; you can delete your own messages, admins can delete any.
+    // FOB chat: every active account can read; members and admins can post (viewers are read-only).
+    // You can delete your own messages, admins can delete any.
     match /chat/{id} {
       allow read: if isMember();
-      allow create: if isMember()
+      allow create: if canWrite()
         && request.resource.data.keys().hasOnly(['text', 'uid', 'username', 'character', 'ts', 'replyTo'])
         && (!('replyTo' in request.resource.data) || request.resource.data.replyTo is map)
         && request.resource.data.uid == request.auth.uid
@@ -56,7 +57,7 @@ service cloud.firestore {
         && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
         && request.resource.data.ts is int;
       // Reactions: anyone may add or remove emoji reactions, nothing else about the message can change.
-      allow update: if isMember()
+      allow update: if canWrite()
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reactions'])
         && request.resource.data.reactions is map && request.resource.data.reactions.size() <= 40;
       allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());

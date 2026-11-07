@@ -574,7 +574,7 @@ const edecode=k=>String.fromCodePoint(...k.slice(1).split("_").map(h=>parseInt(h
 function whoName(uid){const d=S.dir.find(x=>x.id===uid);if(d)return d.character||d.username;const m=S.chat.find(x=>x.uid===uid);return m?(m.character||m.username):"someone"}
 function reactsHtml(m){const r=m.reactions||{};const ks=Object.keys(r).filter(k=>Array.isArray(r[k])&&r[k].length);if(!ks.length)return "";
   return `<div class="reacts">${ks.map(k=>{const on=S.me&&r[k].includes(S.me.id);const names=r[k].map(whoName).join(", ");
-    return `<button type="button" class="react${on?" on":""}" data-togglereact="${m.id}" data-ek="${k}" title="${esc(names)}" aria-label="${esc(edecode(k))} ${r[k].length}, ${on?"remove your reaction":"react"}">${edecode(k)}<b>${r[k].length}</b></button>`}).join("")}</div>`}
+    return `<button type="button" class="react${on?" on":""}" ${S.canWrite?"":"disabled"} data-togglereact="${m.id}" data-ek="${k}" title="${esc(names)}" aria-label="${esc(edecode(k))} ${r[k].length}, ${on?"remove your reaction":"react"}">${edecode(k)}<b>${r[k].length}</b></button>`}).join("")}</div>`}
 async function toggleReact(id,emoji){const m=S.chat.find(x=>x.id===id);if(!m||!S.me)return;const k=ekey(emoji),cur=(m.reactions||{})[k]||[],FV=firebase.firestore.FieldValue;
   try{await db.collection("chat").doc(id).update({["reactions."+k]:cur.includes(S.me.id)?FV.arrayRemove(S.me.id):FV.arrayUnion(S.me.id)})}
   catch(e){setMsg("chat-msg","err",e.code==="permission-denied"?"Reactions aren't switched on yet — the admin needs to update the database rules.":errText(e))}}
@@ -605,14 +605,14 @@ function chatList(){
     const mine=S.me&&m.uid===S.me.id,canDel=mine||S.isAdmin;const t=new Date(m.ts);
     const pinged=!mine&&(mentionsMe(m.text)||(m.replyTo&&S.me&&m.replyTo.uid===S.me.id));
     const rq=m.replyTo?`<div class="rq" data-jump="${esc(m.replyTo.id)}" title="Jump to the original message"><b>@${esc(m.replyTo.username||"")}</b>${esc(m.replyTo.text||"")}</div>`:"";
-    out+=`<div class="cmsg ${mine?"mine":""} ${pinged?"pinged":""}" id="msg-${m.id}">${rq}<div class="tools"><button type="button" data-reactmsg="${m.id}" title="Add reaction" aria-label="Add reaction">😀</button><button type="button" data-replymsg="${m.id}" title="Reply" aria-label="Reply">↩ Reply</button>${canDel?`<button type="button" class="danger" data-delmsg="${m.id}" title="Delete message" aria-label="Delete message">✕</button>`:""}</div><span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${renderMentions(m.text)}</div>${reactsHtml(m)}</div>`}
+    out+=`<div class="cmsg ${mine?"mine":""} ${pinged?"pinged":""}" id="msg-${m.id}">${rq}${S.canWrite||canDel?`<div class="tools">${S.canWrite?`<button type="button" data-reactmsg="${m.id}" title="Add reaction" aria-label="Add reaction">😀</button><button type="button" data-replymsg="${m.id}" title="Reply" aria-label="Reply">↩ Reply</button>`:""}${canDel?`<button type="button" class="danger" data-delmsg="${m.id}" title="Delete message" aria-label="Delete message">✕</button>`:""}</div>`:""}<span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${renderMentions(m.text)}</div>${reactsHtml(m)}</div>`}
   return out;
 }
 function viewChat(){
   if(S.chatDivider==null&&chatUnread())S.chatDivider=chatSeen();
   return `<div class="panel chatbox"><h2>FOB Chat</h2>
    <div class="chatlist" id="chat-list" aria-live="polite">${chatList()}</div>
-   <form class="chatform" id="chat-form" autocomplete="off">${replyBarHtml()}<div class="chatrow"><button class="btn" type="button" id="chat-emoji" title="Add emoji" aria-label="Add emoji" style="font-size:18px;padding:0 10px">😀</button><textarea id="chat-text" maxlength="1000" placeholder="Message the FOB… (Enter to send, Shift+Enter for a new line, @ to mention)" aria-label="Message"></textarea><button class="btn primary" type="submit">Send</button></div></form>
+${S.canWrite?`   <form class="chatform" id="chat-form" autocomplete="off">${replyBarHtml()}<div class="chatrow"><button class="btn" type="button" id="chat-emoji" title="Add emoji" aria-label="Add emoji" style="font-size:18px;padding:0 10px">😀</button><textarea id="chat-text" maxlength="1000" placeholder="Message the FOB… (Enter to send, Shift+Enter for a new line, @ to mention)" aria-label="Message"></textarea><button class="btn primary" type="submit">Send</button></div></form>`:`<div class="chatform"><p style="margin:0;color:var(--muted)"><span class="badge">View only</span> You can read the FOB chat but not post. Ask the admin to make you a Member.</p></div>`}
    <div class="msg" id="chat-msg"></div></div>`;
 }
 function chatAtBottom(el){return el.scrollHeight-el.scrollTop-el.clientHeight<40}
