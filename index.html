@@ -96,6 +96,13 @@ dl.info dd{margin:0}
 .gate .field{margin-bottom:10px}
 .whoami{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted);justify-content:flex-end;width:100%}
 .hidden{display:none!important}
+nav.tabs a{position:relative}
+.tabdot{position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 2px var(--bg)}
+.chatlist{position:relative}
+.newline{display:flex;align-items:center;gap:8px;margin:8px 0 4px;transition:opacity .6s}
+.newline::before{content:"";flex:1;height:1px;background:#e5484d}
+.newline span{font:700 11px/1 var(--body);letter-spacing:.06em;color:#fff;background:#e5484d;padding:3px 6px;border-radius:4px}
+.newline.fade{opacity:0}
 .unread{display:inline-block;min-width:18px;padding:1px 6px;border-radius:999px;background:var(--bad);color:#fff;font:600 12px/1.3 var(--body);letter-spacing:0;vertical-align:2px}
 .chatbox{display:flex;flex-direction:column;height:min(70vh,640px)}
 .chatlist{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:4px 2px 8px}
@@ -141,7 +148,7 @@ dl.info dd{margin:0}
 const TABS=[["chat","FOB Chat"],["log","Storage Log"],["stock","In Storage"],["items","Items"],["stalkers","Stalkers"],["fob","FOB Team"],["profile","Character Profile"],["item","Item Profile"],["lists","Lists"]];
 const DEFAULT_LISTS={actions:["Received","Given out"],categories:["Money","Ingredient","Crafted","Mutant Part","Artifact","Weapon","Ammo","Armor","Medical","Tool","Food","Misc"],storages:["Green Crate","Ecologists Trader"],factions:["Loner","Ecologist","Duty","Freedom","UN Military","Bandit","Mercenary","Monolith"],statuses:["Alive","MIA","KIA","Retired"],ranks:["Lead","Sr.","Sr. Sgt.","Sr. Pvt.","Cst.","Pvt."],teams:["Researcher","Doctor","Professor","Military"],qualities:["Normal","High","Pristine"],sources:["Supply","Chest check","Crafting"]};
 const S={log:[],items:[],stalkers:[],fob:[],lists:DEFAULT_LISTS,ready:{log:false,items:false,stalkers:false,fob:false},
-  canWrite:false,canEdit:false,isAdmin:false,flash:{},chat:[],chatErr:"",chatReady:false,me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
+  canWrite:false,canEdit:false,isAdmin:false,flash:{},chat:[],chatDivider:null,chatErr:"",chatReady:false,me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
 let db=null,auth=null,assets=null,unsubs=[];
 const DOMAIN="fob.local";
 const toEmail=u=>u.trim().toLowerCase()+"@"+DOMAIN;
@@ -178,8 +185,9 @@ function isRuble(n){return (n||"").toLowerCase()==="ruble"}
 /* ---------- render shell ---------- */
 function tabs(){return S.isAdmin?[...TABS,["accounts","Accounts"]]:TABS}
 function route(){const h=(location.hash||"").replace("#","");return tabs().some(t=>t[0]===h)?h:"log"}
-function renderTabs(){const cur=route();if(cur==="chat")markChatRead();const n=chatUnread();
-  $("#tabs").innerHTML=tabs().map(([k,l])=>`<a href="#${k}" ${k===cur?'aria-current="page"':""}>${l}${k==="chat"&&n?` <span class="unread">${n>99?"99+":n}</span>`:""}</a>`).join("")}
+function renderTabs(){const cur=route(),n=chatUnread();
+  $("#tabs").innerHTML=tabs().map(([k,l])=>`<a href="#${k}" ${k===cur?'aria-current="page"':""}>${l}${k==="chat"&&n?`<span class="tabdot" title="${n} new message${n===1?"":"s"}"></span><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> (${n} new)</span>`:""}</a>`).join("");
+  document.title=(n?`(${n>99?"99+":n}) `:"")+"Ecologists Field Database"}
 function renderKpis(){
   const {st}=stockTable();let rub=0,items=0,kinds=0;
   for(const e of st.values()){if(isRuble(e.name))rub=e.total;else if(e.total>0){items+=e.total;kinds++}}
@@ -439,24 +447,40 @@ function chatList(){
   if(S.chatErr)return `<div class="empty">${esc(S.chatErr)}</div>`;
   if(!S.chatReady)return `<div class="empty">Loading messages…</div>`;
   if(!S.chat.length)return `<div class="empty">No messages yet. Say hi to the FOB.</div>`;
-  let out="",day="";
+  let out="",day="",lined=false;const cut=S.chatDivider;
   for(const m of S.chat){const d=fmtDay(m.ts);if(d!==day){day=d;out+=`<div class="cday">${d}</div>`}
+    if(cut!=null&&!lined&&m.ts>cut&&S.me&&m.uid!==S.me.id){lined=true;out+=`<div class="newline" id="chat-new"><span>NEW</span></div>`}
     const mine=S.me&&m.uid===S.me.id,canDel=mine||S.isAdmin;const t=new Date(m.ts);
     out+=`<div class="cmsg ${mine?"mine":""}">${canDel?`<button class="btn small danger del" data-delmsg="${m.id}" title="Delete message">✕</button>`:""}<span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${esc(m.text)}</div></div>`}
   return out;
 }
 function viewChat(){
+  if(S.chatDivider==null&&chatUnread())S.chatDivider=chatSeen();
   return `<div class="panel chatbox"><h2>FOB Chat</h2>
    <div class="chatlist" id="chat-list" aria-live="polite">${chatList()}</div>
    <form class="chatform" id="chat-form" autocomplete="off"><textarea id="chat-text" maxlength="1000" placeholder="Message the FOB… (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea><button class="btn primary" type="submit">Send</button></form>
    <div class="msg" id="chat-msg"></div></div>`;
 }
-function refreshChat(){const el=$("#chat-list");if(!el)return;const atBottom=el.scrollHeight-el.scrollTop-el.clientHeight<80;el.innerHTML=chatList();if(atBottom)el.scrollTop=el.scrollHeight}
+function chatAtBottom(el){return el.scrollHeight-el.scrollTop-el.clientHeight<40}
+function lastOtherTs(){for(let i=S.chat.length-1;i>=0;i--)if(!S.me||S.chat[i].uid!==S.me.id)return S.chat[i].ts;return 0}
+function refreshChat(){const el=$("#chat-list");if(!el)return;const atBottom=chatAtBottom(el),top=el.scrollTop;
+  if(S.chatDivider==null&&!atBottom&&chatUnread())S.chatDivider=chatSeen();
+  el.innerHTML=chatList();el.scrollTop=atBottom?el.scrollHeight:top;checkChatRead()}
+let chatFadeTimer=null;
+function checkChatRead(){const el=$("#chat-list");if(!el||route()!=="chat"||document.hidden)return;
+  if(!chatAtBottom(el))return;
+  if(chatUnread()){markChatRead();renderTabs()}
+  const line=$("#chat-new");
+  if(line&&!chatFadeTimer)chatFadeTimer=setTimeout(()=>{chatFadeTimer=null;const l=$("#chat-new");if(l){l.classList.add("fade");setTimeout(()=>{const x=$("#chat-new");if(x)x.remove()},650)}S.chatDivider=null},2500)}
+function openChat(){const el=$("#chat-list");if(!el)return;const line=$("#chat-new");
+  if(line&&line.offsetTop>el.clientHeight-60)el.scrollTop=Math.max(0,line.offsetTop-40);else el.scrollTop=el.scrollHeight;
+  el.addEventListener("scroll",checkChatRead,{passive:true});checkChatRead()}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkChatRead()});
 async function sendChat(){
   const ta=$("#chat-text"),text=ta.value.trim();if(!text)return;
   if(text.length>1000){setMsg("chat-msg","err","Messages can be up to 1000 characters.");return}
   ta.value="";
-  try{await db.collection("chat").add({text,uid:S.me.id,username:S.me.username,character:S.me.character||"",ts:Date.now()});const m=$("#chat-msg");if(m)m.textContent="";delete S.flash["chat-msg"]}
+  try{await db.collection("chat").add({text,uid:S.me.id,username:S.me.username,character:S.me.character||"",ts:Date.now()});const cl=$("#chat-list");if(cl)cl.scrollTop=cl.scrollHeight;const m=$("#chat-msg");if(m)m.textContent="";delete S.flash["chat-msg"]}
   catch(e){ta.value=text;setMsg("chat-msg","err",e.code==="permission-denied"?"Chat isn't switched on yet — the admin needs to update the database rules.":errText(e))}
 }
 
@@ -625,7 +649,7 @@ function bindView(v){
   $("#add-person")&&($("#add-person").onclick=e=>openPersonModal(e.target.dataset.kind,null));
   if($("#chat-form")){$("#chat-form").onsubmit=ev=>{ev.preventDefault();sendChat()};
     $("#chat-text").addEventListener("keydown",ev=>{if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();sendChat()}});
-    const cl=$("#chat-list");cl.scrollTop=cl.scrollHeight}
+    openChat()}
   $("#acc-new")&&($("#acc-new").onsubmit=ev=>{ev.preventDefault();createAccount()});
   $("#a-gen")&&($("#a-gen").onclick=()=>{$("#a-pass").value=randomPass()});
   $("#imp")&&($("#imp").onsubmit=ev=>{ev.preventDefault();runImport()});
@@ -665,13 +689,13 @@ document.addEventListener("click",async e=>{
   if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Delete?";return}
   t.disabled=true;try{await db.collection("chat").doc(t.dataset.delmsg).delete()}catch(err){t.disabled=false;setMsg("chat-msg","err",errText(err))}
 });
-window.addEventListener("hashchange",()=>{S.flash={};S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
+window.addEventListener("hashchange",()=>{S.flash={};S.chatDivider=null;clearTimeout(chatFadeTimer);chatFadeTimer=null;S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
 
 /* ---------- data ---------- */
 let renderQueued=false;
 function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;
   const a=document.activeElement;
-  if(a&&a.closest&&a.closest("#chat-form")&&route()==="chat"){renderTabs();refreshChat();return}
+  if(route()==="chat"&&$("#chat-list")){renderTabs();renderKpis();refreshChat();return}
   if(a&&a.closest&&(a.closest("#modal")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar)))return;
   if(a&&a.closest&&a.closest("#entry")&&route()==="log"){renderKpis();const {out,m}=logRows();const ls=$("#list-slot");if(ls){ls.innerHTML=logList(out,m);bindView("log-list")}return}
   render()})}
