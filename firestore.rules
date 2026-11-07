@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function memberPath() { return /databases/$(database)/documents/members/$(request.auth.uid); }
+    function isMember() { return signedIn() && exists(memberPath()) && get(memberPath()).data.active == true; }
+    function role() { return get(memberPath()).data.role; }
+    function canWrite() { return isMember() && role() in ['admin', 'member']; }
+    function isAdmin() { return isMember() && role() == 'admin'; }
+    function setupPath() { return /databases/$(database)/documents/setup/state; }
+    function validMember(d) {
+      return d.keys().hasOnly(['username', 'character', 'role', 'active', 'created'])
+        && d.username is string && d.role in ['admin', 'member', 'viewer'] && d.active is bool;
+    }
+
+    // First-time setup: only possible while no admin exists yet.
+    match /setup/state {
+      allow read: if true;
+      allow create: if signedIn() && !exists(setupPath())
+        && getAfter(memberPath()).data.role == 'admin';
+    }
+
+    match /members/{uid} {
+      allow read: if (signedIn() && request.auth.uid == uid) || isAdmin();
+      allow create: if validMember(request.resource.data) && (
+        isAdmin() ||
+        (signedIn() && request.auth.uid == uid && !exists(setupPath()) && existsAfter(setupPath())
+          && request.resource.data.role == 'admin' && request.resource.data.active == true));
+      // Admins manage everyone except themselves (so you can't lock yourself out by accident).
+      allow update: if isAdmin() && uid != request.auth.uid && validMember(request.resource.data)
+        && request.resource.data.username == resource.data.username;
+      allow delete: if isAdmin() && uid != request.auth.uid;
+    }
+
+    match /log/{id}      { allow read: if isMember(); allow write: if canWrite(); }
+    match /items/{id}    { allow read: if isMember(); allow write: if canWrite(); }
+    match /stalkers/{id} { allow read: if isMember(); allow write: if canWrite(); }
+    match /fob/{id}      { allow read: if isMember(); allow write: if canWrite(); }
+    match /config/{id}   { allow read: if isMember(); allow write: if canWrite(); }
+
+    // FOB chat: every active account can read and post; you can delete your own messages, admins can delete any.
+    match /chat/{id} {
+      allow read: if isMember();
+      allow create: if isMember()
+        && request.resource.data.keys().hasOnly(['text', 'uid', 'username', 'character', 'ts'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.username == get(memberPath()).data.username
+        && request.resource.data.character == get(memberPath()).data.get('character', '')
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+        && request.resource.data.ts is int;
+      allow delete: if isMember() && (resource.data.uid == request.auth.uid || isAdmin());
+    }
+
+    // Everything else is closed.
+  }
+}
