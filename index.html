@@ -79,6 +79,10 @@ td.notes{color:var(--muted);max-width:340px;min-width:180px;white-space:normal}
 @media (max-width:820px){.profile{grid-template-columns:1fr}}
 dl.info{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
 dl.info dt{color:var(--muted);font-size:13px}
+.clamp{white-space:pre-wrap;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.clamp.open{display:block;-webkit-line-clamp:unset}
+.moreb{background:none;border:0;padding:2px 0 0;color:var(--accent);cursor:pointer;font:600 12px var(--body)}
+.moreb:hover{text-decoration:underline}
 dl.info dd{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 #modal textarea{min-height:140px}
 .photo{width:100%;aspect-ratio:1;border-radius:8px;background:#34352e;object-fit:contain;display:grid;place-items:center;color:#6a6b5c}
@@ -253,7 +257,7 @@ function render(){
   const v=route(),el=$("#view");
   const fn={log:viewLog,stock:viewStock,items:viewItems,stalkers:viewStalkers,fob:viewFob,profile:viewProfile,item:viewItem,lists:viewLists,accounts:viewAccounts,chat:viewChat}[v];
   el.innerHTML=fn();
-  bindView(v);applyFlash();
+  bindView(v);applyFlash();markClamps();
 }
 function setStatus(t,err){const s=$("#status");s.textContent=t;s.className="status"+(err?" err":"")}
 
@@ -328,7 +332,7 @@ function rowHtml(r,m){
   <td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>
   <td>${r.quality?`<span class="q-${esc(r.quality)}">${esc(r.quality)}</span>`:""}</td>
   <td style="color:var(--muted)">${cat==="?"?'<span class="out">? unknown</span>':esc(cat)}</td>
-  <td class="num">${fmtN(r.qty)}</td><td>${esc(r.storage)}</td><td>${esc(r.handledBy)}</td><td class="notes">${esc(r.notes)}</td>
+  <td class="num">${fmtN(r.qty)}</td><td>${esc(r.storage)}</td><td>${esc(r.handledBy)}</td><td class="notes">${notesCell(r.notes)}</td>
   <td>${S.canWrite?`<div class="row"><button class="btn small" data-edit="${r.id}">Edit</button><button class="btn small danger" data-del="${r.id}">Delete</button></div>`:""}</td></tr>`;
 }
 function viewLog(){
@@ -411,7 +415,7 @@ function viewItems(){
   </div>
   <div class="tablewrap"><table><thead><tr><th>Photo</th><th>Item</th><th>Category</th><th class="num">In stock</th><th class="num">Times logged</th><th>Notes</th><th></th></tr></thead><tbody>
   ${rows.map(i=>{const e=st.get((i.name||"").toLowerCase())||{total:0,count:0};return`<tr><td>${thumb(i)}</td><td><button class="link" data-item="${esc(i.name)}">${esc(i.name)}</button></td><td>${esc(i.category)}</td>
-  <td class="num ${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}">${fmtN(e.total)}</td><td class="num">${e.count}</td><td class="notes">${esc(i.notes)}</td>
+  <td class="num ${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}">${fmtN(e.total)}</td><td class="num">${e.count}</td><td class="notes">${notesCell(i.notes)}</td>
   <td>${S.canWrite?`<button class="btn small" data-edititem="${i.id}">Edit</button>`:""}</td></tr>`}).join("")||`<tr><td colspan="7" class="empty">${S.ready.items?"No items match.":"Loading items…"}</td></tr>`}
   </tbody></table></div>`;
 }
@@ -433,7 +437,7 @@ function viewPeople(kind){
   ${rows.map(p=>`<tr><td>${thumb(p)}</td><td>${fob?esc(p.name):`<button class="link" data-prof="${esc(p.name)}">${esc(p.name)}</button>`}</td><td>${esc(p.callsign)}</td><td>${esc(p.player)}</td>
    ${fob?`<td>${esc(p.rank)}</td><td><span class="tm-${esc(p.team)}" style="font-weight:600">${esc(p.team)}</span></td>`:`<td>${esc(p.faction)}</td>`}
    <td>${p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:""}</td><td>${esc(p.lastSeen)}</td><td>${esc(p.location)}</td>
-   <td class="num">${countFor(p.name,fob?"handledBy":"char")}</td><td class="notes">${esc(p.notes)}</td>
+   <td class="num">${countFor(p.name,fob?"handledBy":"char")}</td><td class="notes">${notesCell(p.notes)}</td>
    <td>${S.canWrite?`<button class="btn small" data-editperson="${p.id}" data-kind="${kind}">Edit</button>`:""}</td></tr>`).join("")||`<tr><td colspan="12" class="empty">${S.ready[kind]?"Nobody matches.":"Loading…"}</td></tr>`}
   </tbody></table></div>`;
 }
@@ -508,6 +512,13 @@ function bindPicker(id,set){
   list.addEventListener("mousemove",ev=>{const o=ev.target.closest(".opt");if(o&&+o.dataset.i!==hi){hi=+o.dataset.i;list.querySelectorAll(".opt").forEach(x=>x.classList.toggle("hi",+x.dataset.i===hi))}});
   el.addEventListener("blur",()=>setTimeout(()=>{if(document.activeElement!==el){close();el.value=cur}},120));
 }
+const openNotes=new Set();
+function notesCell(t){if(!t)return "";const k=String(t).length+":"+String(t).slice(0,40);return `<div class="clamp${openNotes.has(k)?" open":""}" data-nk="${esc(k)}">${esc(t)}</div>`}
+function markClamps(root){(root||document).querySelectorAll(".clamp:not([data-done])").forEach(c=>{c.dataset.done="1";
+  const open=c.classList.contains("open");if(!open&&c.scrollHeight<=c.clientHeight+2)return;
+  c.insertAdjacentHTML("afterend",`<button type="button" class="moreb" data-more>${open?"Show less":"Show more"}</button>`)})}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-more]");if(!b)return;const c=b.previousElementSibling;if(!c||!c.classList.contains("clamp"))return;
+  const open=c.classList.toggle("open");b.textContent=open?"Show less":"Show more";if(open)openNotes.add(c.dataset.nk);else openNotes.delete(c.dataset.nk)});
 function historyTable(rows,cols){
   const m=itemMap();
   return `<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th${c[2]?' class="num"':""}>${c[0]}</th>`).join("")}</tr></thead><tbody>
@@ -531,7 +542,7 @@ function viewProfile(){
      <dt>Items they brought in</dt><dd>${fmtN(itIn)}</dd><dt>Items given to them</dt><dd>${fmtN(itOut)}</dd><dt>Log entries</dt><dd>${rows.length}</dd></dl></div>
    <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(p.name)}">`:`<div class="photo">No photo</div>`}</div>
   </div>
-  <div class="panel"><h2>Trade history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Item",r=>`<td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>`],["Category",(r,m)=>`<td style="color:var(--muted)">${esc(categoryOf(r.item,m))}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["With",r=>`<td style="white-space:normal">${esc(people(r).filter(n=>n!==S.profile).join(", "))}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
+  <div class="panel"><h2>Trade history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Item",r=>`<td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>`],["Category",(r,m)=>`<td style="color:var(--muted)">${esc(categoryOf(r.item,m))}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["With",r=>`<td style="white-space:normal">${esc(people(r).filter(n=>n!==S.profile).join(", "))}</td>`],["Notes",r=>`<td class="notes">${notesCell(r.notes)}</td>`]])}</div>`;
 }
 function viewItem(){
   const names=S.items.map(i=>i.name).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
@@ -547,7 +558,7 @@ function viewItem(){
      ${stor.map(s=>`<dt>${esc(s)}</dt><dd>${fmtN(e.by[s]||0)}</dd>`).join("")}<dt>Total received</dt><dd>${fmtN(e.rec)}</dd><dt>Total given out</dt><dd>${fmtN(e.out)}</dd></dl></div>
    <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(it.name)}">`:`<div class="photo">No photo</div>`}</div>
   </div>
-  <div class="panel"><h2>Item history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Character",r=>`<td>${S.viewer?esc(people(r).join(", ")):people(r).map(n=>`<button class="link" data-prof="${esc(n)}">${esc(n)}</button>`).join(", ")}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Quality",r=>`<td>${esc(r.quality)}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["Storage",r=>`<td>${esc(r.storage)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
+  <div class="panel"><h2>Item history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Character",r=>`<td>${S.viewer?esc(people(r).join(", ")):people(r).map(n=>`<button class="link" data-prof="${esc(n)}">${esc(n)}</button>`).join(", ")}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Quality",r=>`<td>${esc(r.quality)}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["Storage",r=>`<td>${esc(r.storage)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Notes",r=>`<td class="notes">${notesCell(r.notes)}</td>`]])}</div>`;
 }
 
 /* ---------- Lists ---------- */
@@ -912,7 +923,7 @@ function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimation
   const a=document.activeElement;
   if(route()==="chat"&&$("#chat-list")){renderTabs();renderKpis();refreshChat();return}
   if(a&&a.closest&&(a.closest("#modal")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar))){renderKpis();return}
-  if(a&&a.closest&&a.closest("#entry")&&route()==="log"){renderKpis();const {out,m}=logRows();const ls=$("#list-slot");if(ls){ls.innerHTML=logList(out,m);bindView("log-list")}return}
+  if(a&&a.closest&&a.closest("#entry")&&route()==="log"){renderKpis();const {out,m}=logRows();const ls=$("#list-slot");if(ls){ls.innerHTML=logList(out,m);bindView("log-list");markClamps(ls)}return}
   render()})}
 function sub(name,query){
   const timer=setTimeout(()=>{if(!S.ready[name])setStatus("Can't reach the database right now. Showing the last data loaded. Check your internet.",true)},10000);
