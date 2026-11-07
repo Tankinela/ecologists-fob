@@ -388,6 +388,20 @@ function viewPeople(kind){
 const viewStalkers=()=>viewPeople("stalkers"),viewFob=()=>viewPeople("fob");
 
 /* ---------- Profiles ---------- */
+function pickerHtml(id,names,cur,ph){
+  return `<input id="${id}" type="search" list="${id}-dl" value="${esc(cur)}" placeholder="${esc(ph)}" style="width:auto;min-width:280px" autocomplete="off" aria-label="${esc(ph)}">
+  <datalist id="${id}-dl">${names.map(n=>`<option value="${esc(n)}">`).join("")}</datalist><span class="msg" id="${id}-msg" style="margin:0"></span>`}
+function bindPicker(id,set){
+  const el=$("#"+id);if(!el)return;const names=[...$("#"+id+"-dl").options].map(o=>o.value);
+  const go=v=>{set(v);render()};
+  const exact=q=>names.find(n=>n.toLowerCase()===q.trim().toLowerCase());
+  el.addEventListener("focus",()=>el.select());
+  el.addEventListener("input",()=>{const n=exact(el.value);if(n&&n!==el.defaultValue&&el.value===n)go(n)});
+  el.addEventListener("keydown",ev=>{if(ev.key!=="Enter")return;ev.preventDefault();const q=el.value.trim().toLowerCase();if(!q)return;
+    const n=exact(q)||names.find(n=>n.toLowerCase().startsWith(q))||names.find(n=>n.toLowerCase().includes(q));
+    if(n)go(n);else{const m=$("#"+id+"-msg");m.className="msg err";m.textContent="No match."}});
+  el.addEventListener("change",()=>{const n=exact(el.value);if(n&&n!==el.defaultValue)go(n)});
+}
 function historyTable(rows,cols){
   const m=itemMap();
   return `<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th${c[2]?' class="num"':""}>${c[0]}</th>`).join("")}</tr></thead><tbody>
@@ -403,7 +417,7 @@ function viewProfile(){
     if(r.action==="Given out"){rub?rubOut+=q:itOut+=q}else{rub?rubIn+=q:itIn+=q}}
   const ph=photoUrl(p.photo);
   return `<div class="panel"><div class="row"><label for="pick" style="color:var(--muted)">Select stalker</label>
-    <select id="pick" style="width:auto;min-width:240px">${opts(names,S.profile)}</select></div></div>
+    ${pickerHtml("pick",names,S.profile,"Type a name to search…")}</div></div>
   <div class="profile">
    <div class="panel"><h2>Info</h2><dl class="info">${STALKER_FIELDS.filter(f=>f[0]!=="name").map(f=>`<dt>${f[1]}</dt><dd>${f[0]==="status"&&p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:esc(p[f[0]])||'<span style="color:#5f6153">—</span>'}</dd>`).join("")}</dl></div>
    <div class="panel"><h2>Totals</h2><dl class="info">
@@ -420,7 +434,7 @@ function viewItem(){
   const rows=S.log.filter(r=>(r.item||"").toLowerCase()===(S.itemSel||"").toLowerCase()).sort((a,b)=>(b.ts||0)-(a.ts||0));
   const ph=photoUrl(it.photo),last=rows[0];
   return `<div class="panel"><div class="row"><label for="pick-item" style="color:var(--muted)">Select item</label>
-    <select id="pick-item" style="width:auto;min-width:260px">${opts(names,S.itemSel)}</select></div></div>
+    ${pickerHtml("pick-item",names,S.itemSel,"Type an item to search…")}</div></div>
   <div class="profile">
    <div class="panel"><h2>Info</h2><dl class="info"><dt>Category</dt><dd>${esc(it.category)||"—"}</dd><dt>Times logged</dt><dd>${e.count}</dd><dt>Last moved</dt><dd>${last?fmtTs(last.ts):"—"}</dd><dt>Notes</dt><dd>${esc(it.notes)||"—"}</dd></dl></div>
    <div class="panel"><h2>Stock</h2><dl class="info"><dt><b>In stock (total)</b></dt><dd><b class="${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}" style="font-size:20px">${fmtN(e.total)}</b></dd>
@@ -631,8 +645,8 @@ function bindView(v){
   $("#f-action")&&($("#f-action").onchange=e=>{S.f.action=e.target.value;render()});
   $("#f-cat")&&($("#f-cat").onchange=e=>{S.f.cat=e.target.value;render()});
   $("#f-only")&&($("#f-only").onchange=e=>{S.f.onlyStock=e.target.checked;render()});
-  $("#pick")&&($("#pick").onchange=e=>{S.profile=e.target.value;render()});
-  $("#pick-item")&&($("#pick-item").onchange=e=>{S.itemSel=e.target.value;render()});
+  bindPicker("pick",v=>{S.profile=v});
+  bindPicker("pick-item",v=>{S.itemSel=v});
   const form=$("#entry");
   if(form){form.onsubmit=ev=>{ev.preventDefault();saveEntry()};
     $("#e-cancel")&&($("#e-cancel").onclick=()=>{S.edit=null;resetForm();render()});
