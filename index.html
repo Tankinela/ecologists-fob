@@ -109,6 +109,17 @@ dl.info dd{margin:0}
 nav.tabs a{position:relative}
 .tabdot{position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 2px var(--bg)}
 .chatlist{position:relative}
+.chatform{position:relative}
+.mention{color:#ffd166;background:rgba(255,209,102,.12);border-radius:3px;padding:0 2px;font-weight:600}
+.mention.me{color:#10140b;background:#ffd166}
+.cmsg.pinged{background:rgba(255,209,102,.08);box-shadow:inset 3px 0 0 #ffd166}
+.cmsg.pinged:hover{background:rgba(255,209,102,.13)}
+.mentionbox{position:absolute;left:0;bottom:calc(100% + 4px);width:min(360px,100%);background:var(--panel-2);border:1px solid #4a5638;border-radius:6px;box-shadow:0 10px 28px rgba(0,0,0,.55);padding:4px 0;z-index:30}
+.mentionbox .mh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:2px 12px 4px}
+.mentionbox .mo{padding:5px 12px;cursor:pointer;display:flex;gap:8px;align-items:baseline}
+.mentionbox .mo.hi{background:#9cc3f5;color:#10140b}
+.mentionbox .mo small{color:var(--muted)}
+.mentionbox .mo.hi small{color:#2a3320}
 .newline{display:flex;align-items:center;gap:8px;margin:8px 0 4px;transition:opacity .6s}
 .newline::before{content:"";flex:1;height:1px;background:#e5484d}
 .newline span{font:700 11px/1 var(--body);letter-spacing:.06em;color:#fff;background:#e5484d;padding:3px 6px;border-radius:4px}
@@ -158,7 +169,7 @@ nav.tabs a{position:relative}
 const TABS=[["chat","FOB Chat"],["log","Storage Log"],["stock","In Storage"],["items","Items"],["stalkers","Stalkers"],["fob","FOB Team"],["profile","Character Profile"],["item","Item Profile"],["lists","Lists"]];
 const DEFAULT_LISTS={actions:["Received","Given out"],categories:["Money","Ingredient","Crafted","Mutant Part","Artifact","Weapon","Ammo","Armor","Medical","Tool","Food","Misc"],storages:["Green Crate","Ecologists Trader"],factions:["Loner","Ecologist","Duty","Freedom","UN Military","Bandit","Mercenary","Monolith"],statuses:["Alive","MIA","KIA","Retired"],ranks:["Lead","Sr.","Sr. Sgt.","Sr. Pvt.","Cst.","Pvt."],teams:["Researcher","Doctor","Professor","Military"],qualities:["Normal","High","Pristine"],sources:["Supply","Chest check","Crafting"]};
 const S={log:[],items:[],stalkers:[],fob:[],lists:DEFAULT_LISTS,ready:{log:false,items:false,stalkers:false,fob:false},
-  canWrite:false,canEdit:false,isAdmin:false,flash:{},chat:[],chatDivider:null,chatErr:"",chatReady:false,me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
+  canWrite:false,canEdit:false,isAdmin:false,flash:{},chat:[],dir:[],chatDivider:null,chatErr:"",chatReady:false,me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
 let db=null,auth=null,assets=null,unsubs=[];
 const DOMAIN="fob.local";
 const toEmail=u=>u.trim().toLowerCase()+"@"+DOMAIN;
@@ -481,6 +492,12 @@ function chatSeenKey(){return "fobchat-seen-"+(S.me?S.me.id:"")}
 function chatSeen(){try{return Number(localStorage.getItem(chatSeenKey()))||0}catch(_){return S._seen||0}}
 function markChatRead(){const last=S.chat.length?S.chat[S.chat.length-1].ts:0;if(last>chatSeen()){S._seen=last;try{localStorage.setItem(chatSeenKey(),String(last))}catch(_){}}}
 function chatUnread(){if(!S.me)return 0;const seen=chatSeen();if(!seen&&S.chat.length&&!S._seenInit){S._seenInit=true;markChatRead();return 0}return S.chat.filter(m=>m.ts>seen&&m.uid!==S.me.id).length}
+function dirNames(){const set=new Set(S.dir.map(d=>(d.username||"").toLowerCase()));for(const m of S.chat)set.add((m.username||"").toLowerCase());return set}
+const MENTION_RE=/(^|[^a-z0-9._-])@([a-z0-9._-]{3,30})/gi;
+function mentionsMe(text){if(!S.me)return false;const me=S.me.username.toLowerCase();let m;MENTION_RE.lastIndex=0;while((m=MENTION_RE.exec(text||"")))if(m[2].toLowerCase()===me||m[2].toLowerCase()==="everyone")return true;return false}
+function renderMentions(text){const known=dirNames(),me=S.me?S.me.username.toLowerCase():"";
+  return esc(text).replace(/(^|[^a-z0-9._-])@([a-z0-9._-]{3,30})/gi,(all,pre,u)=>{const l=u.toLowerCase();
+    if(l!=="everyone"&&!known.has(l))return all;return `${pre}<span class="mention${l===me||l==="everyone"?" me":""}">@${u}</span>`})}
 function chatList(){
   if(S.chatErr)return `<div class="empty">${esc(S.chatErr)}</div>`;
   if(!S.chatReady)return `<div class="empty">Loading messages…</div>`;
@@ -489,7 +506,8 @@ function chatList(){
   for(const m of S.chat){const d=fmtDay(m.ts);if(d!==day){day=d;out+=`<div class="cday">${d}</div>`}
     if(cut!=null&&!lined&&m.ts>cut&&S.me&&m.uid!==S.me.id){lined=true;out+=`<div class="newline" id="chat-new"><span>NEW</span></div>`}
     const mine=S.me&&m.uid===S.me.id,canDel=mine||S.isAdmin;const t=new Date(m.ts);
-    out+=`<div class="cmsg ${mine?"mine":""}">${canDel?`<button class="btn small danger del" data-delmsg="${m.id}" title="Delete message">✕</button>`:""}<span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${esc(m.text)}</div></div>`}
+    const pinged=!mine&&mentionsMe(m.text);
+    out+=`<div class="cmsg ${mine?"mine":""} ${pinged?"pinged":""}">${canDel?`<button class="btn small danger del" data-delmsg="${m.id}" title="Delete message">✕</button>`:""}<span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${renderMentions(m.text)}</div></div>`}
   return out;
 }
 function viewChat(){
@@ -514,6 +532,23 @@ function openChat(){const el=$("#chat-list");if(!el)return;const line=$("#chat-n
   if(line&&line.offsetTop>el.clientHeight-60)el.scrollTop=Math.max(0,line.offsetTop-40);else el.scrollTop=el.scrollHeight;
   el.addEventListener("scroll",checkChatRead,{passive:true});checkChatRead()}
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkChatRead()});
+function mentionCandidates(q){q=q.toLowerCase();const me=S.me?S.me.username:"";
+  const list=[{username:"everyone",character:"ping all FOB members"},...S.dir.filter(d=>d.username&&d.username!==me).sort((a,b)=>a.username.localeCompare(b.username))];
+  const a=list.filter(d=>d.username.toLowerCase().startsWith(q)||(d.character||"").toLowerCase().startsWith(q)),
+        b=list.filter(d=>!a.includes(d)&&(d.username.toLowerCase().includes(q)||(d.character||"").toLowerCase().includes(q)));
+  return a.concat(b).slice(0,8)}
+let mbox={open:false,list:[],hi:0,start:0};
+function mentionToken(ta){const before=ta.value.slice(0,ta.selectionStart),m=before.match(/(^|\s)@([a-z0-9._-]*)$/i);return m?{q:m[2],start:before.length-m[2].length-1}:null}
+function drawMentionBox(){let box=$("#mention-box");
+  if(!mbox.open||!mbox.list.length){if(box)box.remove();mbox.open=false;return}
+  if(!box){$("#chat-form").insertAdjacentHTML("afterbegin",'<div class="mentionbox" id="mention-box" role="listbox"></div>');box=$("#mention-box")}
+  box.innerHTML='<div class="mh">Members</div>'+mbox.list.map((d,i)=>`<div class="mo${i===mbox.hi?" hi":""}" data-mi="${i}" role="option"><b>@${esc(d.username)}</b><small>${esc(d.character||"")}</small></div>`).join("")}
+function updateMentionBox(){const ta=$("#chat-text");if(!ta)return;const t=mentionToken(ta);
+  if(!t){mbox.open=false;drawMentionBox();return}
+  mbox={open:true,list:mentionCandidates(t.q),hi:0,start:t.start};drawMentionBox()}
+function insertMention(d){const ta=$("#chat-text"),end=ta.selectionStart;
+  ta.value=ta.value.slice(0,mbox.start)+"@"+d.username+" "+ta.value.slice(end);const pos=mbox.start+d.username.length+2;
+  ta.setSelectionRange(pos,pos);ta.focus();mbox.open=false;drawMentionBox()}
 async function sendChat(){
   const ta=$("#chat-text"),text=ta.value.trim();if(!text)return;
   if(text.length>1000){setMsg("chat-msg","err","Messages can be up to 1000 characters.");return}
@@ -686,7 +721,18 @@ function bindView(v){
   $("#add-item")&&($("#add-item").onclick=()=>openItemModal(null));
   $("#add-person")&&($("#add-person").onclick=e=>openPersonModal(e.target.dataset.kind,null));
   if($("#chat-form")){$("#chat-form").onsubmit=ev=>{ev.preventDefault();sendChat()};
-    $("#chat-text").addEventListener("keydown",ev=>{if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();sendChat()}});
+    const ta=$("#chat-text");mbox.open=false;
+    ta.addEventListener("keydown",ev=>{
+      if(mbox.open){
+        if(ev.key==="ArrowDown"){ev.preventDefault();mbox.hi=(mbox.hi+1)%mbox.list.length;drawMentionBox();return}
+        if(ev.key==="ArrowUp"){ev.preventDefault();mbox.hi=(mbox.hi-1+mbox.list.length)%mbox.list.length;drawMentionBox();return}
+        if(ev.key==="Enter"||ev.key==="Tab"){ev.preventDefault();insertMention(mbox.list[mbox.hi]);return}
+        if(ev.key==="Escape"){ev.preventDefault();ev.stopPropagation();mbox.open=false;drawMentionBox();return}}
+      if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();sendChat()}});
+    ta.addEventListener("input",updateMentionBox);
+    ta.addEventListener("click",updateMentionBox);
+    ta.addEventListener("blur",()=>setTimeout(()=>{mbox.open=false;drawMentionBox()},150));
+    $("#chat-form").addEventListener("mousedown",ev=>{const o=ev.target.closest("[data-mi]");if(o){ev.preventDefault();insertMention(mbox.list[+o.dataset.mi])}});
     openChat()}
   $("#acc-new")&&($("#acc-new").onsubmit=ev=>{ev.preventDefault();createAccount()});
   $("#a-gen")&&($("#a-gen").onclick=()=>{$("#a-pass").value=randomPass()});
@@ -743,7 +789,15 @@ function sub(name,query){
     if(Object.values(S.ready).every(Boolean))setStatus(S.canWrite?"Live · changes from other FOB members appear automatically.":"Live · view only.");
     queueRender()},err=>{clearTimeout(timer);S.ready[name]=true;setStatus(err.code==="permission-denied"?"Your account can't read this data. Ask the admin.":"Couldn't load part of the data. Reload the page to try again.",true);queueRender()}));
 }
-function stopData(){unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[];S.chat=[];S.chatReady=false;S.chatErr="";S._seenInit=false;S.formState=null;S.edit=null;S.flash={};S.chatDivider=null}
+let dirSynced=false;
+function syncSelfDir(){if(!S.me||dirSynced)return;dirSynced=true;const d=S.dir.find(x=>x.id===S.me.id),want={username:S.me.username,character:S.me.character||""};
+  if(!d||d.username!==want.username||(d.character||"")!==want.character)db.collection("directory").doc(S.me.id).set(want).catch(()=>{dirSynced=false})}
+function syncDirectory(){if(!S.isAdmin)return;
+  for(const m of S.members){const d=S.dir.find(x=>x.id===m.id);
+    if(m.active){if(!d||d.username!==m.username||(d.character||"")!==(m.character||""))db.collection("directory").doc(m.id).set({username:m.username,character:m.character||""}).catch(()=>{})}
+    else if(d)db.collection("directory").doc(m.id).delete().catch(()=>{})}
+  for(const d of S.dir)if(!S.members.some(m=>m.id===d.id))db.collection("directory").doc(d.id).delete().catch(()=>{})}
+function stopData(){dirSynced=false;unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[];S.chat=[];S.dir=[];S.chatReady=false;S.chatErr="";S._seenInit=false;S.formState=null;S.edit=null;S.flash={};S.chatDivider=null}
 function startData(){
   stopData();
   sub("log",db.collection("log").orderBy("ts","desc").limit(2000));
@@ -754,7 +808,9 @@ function startData(){
   unsubs.push(db.collection("chat").orderBy("ts","desc").limit(200).onSnapshot(s=>{S.chat=s.docs.map(d=>({id:d.id,...d.data()})).reverse();S.chatReady=true;S.chatErr="";
     if(route()==="chat"&&$("#chat-list")){renderTabs();refreshChat()}else queueRender()},
     err=>{S.chatReady=true;S.chatErr=err.code==="permission-denied"?"Chat isn't switched on yet — the admin needs to update the database rules in Firebase.":"Couldn't load the chat. Reload the page to try again.";queueRender()}));
-  if(S.isAdmin)unsubs.push(db.collection("members").onSnapshot(s=>{S.members=s.docs.map(d=>({id:d.id,...d.data()}));queueRender()},()=>{}));
+  unsubs.push(db.collection("directory").onSnapshot(s=>{S.dir=s.docs.map(d=>({id:d.id,...d.data()}));syncSelfDir();
+    if(route()==="chat"&&$("#chat-list"))refreshChat()},()=>{}));
+  if(S.isAdmin)unsubs.push(db.collection("members").onSnapshot(s=>{S.members=s.docs.map(d=>({id:d.id,...d.data()}));syncDirectory();queueRender()},()=>{}));
 }
 
 /* ---------- login gate ---------- */
