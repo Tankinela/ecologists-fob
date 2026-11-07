@@ -96,6 +96,12 @@ dl.info dd{margin:0}
 .gate .field{margin-bottom:10px}
 .whoami{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted);justify-content:flex-end;width:100%}
 .hidden{display:none!important}
+.irows{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.irow{display:grid;grid-template-columns:140px minmax(180px,1fr) 130px 100px 38px;gap:8px;align-items:end}
+.irow .field label{display:none}
+.irow:first-child .field label{display:block}
+.irow .rm{height:36px}
+@media (max-width:700px){.irow{grid-template-columns:1fr 1fr;padding:8px;border:1px solid var(--line);border-radius:6px}.irow .field label{display:block}.irow .f-item{grid-column:1/-1}}
 </style>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -165,6 +171,7 @@ function renderKpis(){
 }
 function render(){
   renderTabs();renderKpis();
+  captureForm();
   const v=route(),el=$("#view");
   const fn={log:viewLog,stock:viewStock,items:viewItems,stalkers:viewStalkers,fob:viewFob,profile:viewProfile,item:viewItem,lists:viewLists,accounts:viewAccounts}[v];
   el.innerHTML=fn();
@@ -181,26 +188,42 @@ function datalists(){
   <datalist id="dl-fob">${S.fob.slice().sort(byName).map(f=>`<option value="${esc(f.name)}">`).join("")}</datalist>`;
 }
 function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:"")+list.map(o=>`<option ${o===sel?"selected":""}>${esc(o)}</option>`).join("")}
+function resetForm(){const f=$("#entry");if(f)f.remove();S.formState=null;delete S.flash["e-msg"]}
+function blankRow(action){return {action:action||"Received",item:"",quality:"",qty:""}}
+function itemRowHtml(r,i,editing){
+  return `<div class="irow">
+    <div class="field"><label>Action</label><select class="r-action" aria-label="Action">${opts(L("actions"),r.action||"Received")}</select></div>
+    <div class="field f-item"><label>Item</label><input class="r-item" list="dl-items" value="${esc(r.item||"")}" aria-label="Item"></div>
+    <div class="field"><label>Quality</label><select class="r-quality" aria-label="Quality">${opts(L("qualities"),r.quality||"","—")}</select></div>
+    <div class="field"><label>Qty</label><input class="r-qty" type="number" min="1" step="1" value="${esc(r.qty||"")}" aria-label="Quantity"></div>
+    ${editing?"<span></span>":`<button class="btn rm" type="button" data-rmrow aria-label="Remove this item" title="Remove this item">✕</button>`}
+  </div>`}
+function formFromEdit(e){return {ts:e.ts,character:e.character,with:e.with,storage:e.storage,handledBy:e.handledBy,notes:e.notes,rows:[{action:e.action,item:e.item,quality:e.quality,qty:e.qty}]}}
+function captureForm(){
+  if(!$("#entry"))return;const v=id=>($("#"+id)||{}).value||"";const ts=new Date(v("e-ts")).getTime();
+  S.formState={ts:isNaN(ts)?Date.now():ts,character:v("e-char"),with:v("e-with"),storage:v("e-storage"),handledBy:v("e-by"),notes:v("e-notes"),
+    rows:[...document.querySelectorAll("#e-rows .irow")].map(r=>({action:r.querySelector(".r-action").value,item:r.querySelector(".r-item").value,quality:r.querySelector(".r-quality").value,qty:r.querySelector(".r-qty").value}))};
+}
 function entryForm(){
   if(!S.canWrite)return `<div class="panel"><span class="badge">View only</span> You can read the database but not add entries. Ask the admin to change your role to Member.</div>`;
-  const e=S.edit||S.draft||{handledBy:(S.me&&S.me.character)||""};const editing=!!S.edit;
+  const editing=!!S.edit;
+  const e=S.formState||(editing?formFromEdit(S.edit):{handledBy:(S.me&&S.me.character)||"",rows:[blankRow()]});
+  const rows=(e.rows&&e.rows.length)?e.rows:[blankRow()];
   return `<form class="panel" id="entry" autocomplete="off">
-  <h2>${editing?"Edit entry":"New entry"}</h2>${datalists()}
+  <h2>${editing?"Edit entry":"New trade"}</h2>${datalists()}
   <div class="grid">
     <div class="field"><label for="e-ts">Date &amp; time</label><input id="e-ts" type="datetime-local" value="${toLocalInput(e.ts||Date.now())}"></div>
     <div class="field"><label for="e-char">Character / source</label><input id="e-char" list="dl-chars" value="${esc(e.character||"")}" required></div>
     <div class="field"><label for="e-with">With (2nd stalker)</label><input id="e-with" list="dl-stalkers" value="${esc(e.with||"")}"></div>
-    <div class="field"><label for="e-action">Action</label><select id="e-action">${opts(L("actions"),e.action||"Received")}</select></div>
-    <div class="field"><label for="e-item">Item</label><input id="e-item" list="dl-items" value="${esc(e.item||"")}" required></div>
-    <div class="field"><label for="e-quality">Quality</label><select id="e-quality">${opts(L("qualities"),e.quality||"","—")}</select></div>
-    <div class="field"><label for="e-qty">Qty</label><input id="e-qty" type="number" min="1" step="1" value="${esc(e.qty||"")}" required></div>
     <div class="field"><label for="e-storage">Storage</label><select id="e-storage">${opts(L("storages"),e.storage||"","—")}</select></div>
     <div class="field"><label for="e-by">Handled by (FOB)</label><input id="e-by" list="dl-fob" value="${esc(e.handledBy||"")}"></div>
     <div class="field wide"><label for="e-notes">Notes</label><input id="e-notes" value="${esc(e.notes||"")}"></div>
   </div>
+  <div class="irows" id="e-rows">${rows.map((r,i)=>itemRowHtml(r,i,editing)).join("")}</div>
   <div class="row" style="margin-top:10px">
-    <button class="btn primary" type="submit" id="e-save">${editing?"Save changes":"Save entry"}</button>
-    ${editing?`<button class="btn" type="button" id="e-cancel">Cancel</button>`:`<button class="btn" type="button" id="e-more">Save &amp; add another item to this trade</button>`}
+    ${editing?"":`<button class="btn" type="button" id="e-addrow">+ Add item</button>`}
+    <button class="btn primary" type="submit" id="e-save">${editing?"Save changes":"Save trade"}</button>
+    ${editing?`<button class="btn" type="button" id="e-cancel">Cancel</button>`:`<button class="btn" type="button" id="e-clear">Clear</button>`}
   </div>
   <div class="msg" id="e-msg"></div>
   </form>`;
@@ -249,25 +272,23 @@ function logList(out,m){
   <div class="tablewrap"><table><thead><tr><th>Date</th><th>Character</th><th>With</th><th>Action</th><th>Item</th><th>Quality</th><th>Category</th><th class="num">Qty</th><th>Storage</th><th>Handled by</th><th>Notes</th><th></th></tr></thead>
   <tbody>${body||`<tr><td colspan="12" class="empty">${S.ready.log?"No entries match.":"Loading entries…"}</td></tr>`}</tbody></table></div>`;
 }
-function readEntry(){
-  const v=id=>$("#"+id).value.trim();
-  const ts=new Date($("#e-ts").value).getTime();
-  return {ts:isNaN(ts)?Date.now():ts,character:v("e-char"),with:v("e-with"),action:v("e-action"),item:v("e-item"),quality:v("e-quality"),
-    qty:Number(v("e-qty")),storage:v("e-storage"),handledBy:v("e-by"),notes:v("e-notes")};
-}
-async function saveEntry(keep){
-  const msg=$("#e-msg"),e=readEntry();msg.className="msg";
-  if(!e.character||!e.item||!(e.qty>0)){msg.className="msg err";msg.textContent="Fill in Character, Item and a quantity above 0.";return}
-  const it=itemMap().get(e.item.toLowerCase());
-  if(!it){msg.className="msg err";msg.innerHTML=`“${esc(e.item)}” is not in the item list. <button class="btn small" type="button" id="e-additem">Add it to Items</button>`;
-    $("#e-additem").onclick=()=>openItemModal(null,e.item);return}
-  e.item=it.name;
+async function saveEntry(){
+  captureForm();const f=S.formState,msg=$("#e-msg");msg.className="msg";
+  const rows=f.rows.map(r=>({...r,item:r.item.trim(),qty:Number(r.qty)})).filter(r=>r.item||r.qty);
+  if(!f.character.trim()){msg.className="msg err";msg.textContent="Fill in the Character.";return}
+  if(!rows.length){msg.className="msg err";msg.textContent="Add at least one item with a quantity.";return}
+  const bad=rows.find(r=>!r.item||!(r.qty>0));
+  if(bad){msg.className="msg err";msg.textContent=`Every item needs a name and a quantity above 0${bad.item?` (check “${bad.item}”)`:""}.`;return}
+  const m=itemMap(),missing=rows.find(r=>!m.get(r.item.toLowerCase()));
+  if(missing){msg.className="msg err";msg.innerHTML=`“${esc(missing.item)}” is not in the item list. <button class="btn small" type="button" id="e-additem">Add it to Items</button>`;
+    $("#e-additem").onclick=()=>openItemModal(null,missing.item);return}
+  const base={ts:f.ts,character:f.character.trim(),with:f.with.trim(),storage:f.storage,handledBy:f.handledBy.trim(),notes:f.notes.trim()};
+  const docs=rows.map(r=>({...base,action:r.action,item:m.get(r.item.toLowerCase()).name,quality:r.quality,qty:r.qty}));
   const btns=[...document.querySelectorAll("#entry button")];btns.forEach(b=>b.disabled=true);
   try{
-    if(S.edit){e.by=S.edit.by||"";await db.collection("log").doc(S.edit.id).set(e);S.edit=null;S.draft=null}
-    else{e.by=S.me?S.me.username:"";await db.collection("log").add(e);S.draft=keep?{...e,item:"",qty:"",quality:"",notes:""}:null}
-    render();setMsg("e-msg","ok",keep?"Saved. Add the next item of this trade.":"Saved.")
-    if(keep)$("#e-item")?.focus();
+    if(S.edit){await db.collection("log").doc(S.edit.id).set({...docs[0],by:S.edit.by||""});S.edit=null}
+    else{const b=db.batch();for(const d of docs)b.set(db.collection("log").doc(),{...d,by:S.me?S.me.username:""});await b.commit()}
+    resetForm();render();setMsg("e-msg","ok",docs.length>1?`Saved ${docs.length} items for this trade.`:"Saved.");
   }catch(err){btns.forEach(b=>b.disabled=false);msg.className="msg err";msg.textContent=errText(err)}
 }
 function errText(err){const c=err&&err.code;
@@ -509,7 +530,7 @@ function openItemModal(id,prefill){
         if(rec.name!==name){for(const r of S.log.filter(r=>(r.item||"").toLowerCase()===rec.name.toLowerCase())){await db.collection("log").doc(r.id).update({item:name})}}}
       else await db.collection("items").add(data);
       closeModal();
-      if(prefill&&$("#e-item")){$("#e-item").value=name;$("#e-msg").className="msg ok";$("#e-msg").textContent=`Added “${name}” to Items. Press Save entry again.`}
+      if(prefill&&S.formState){for(const r of S.formState.rows)if(r.item.trim().toLowerCase()===prefill.toLowerCase())r.item=name;render();setMsg("e-msg","ok",`Added “${name}” to Items. Press Save trade again.`)}
     }catch(e){$("#m-form").querySelectorAll("button").forEach(b=>b.disabled=false);msg.className="msg err";msg.textContent=errText(e)}};
 }
 function openPersonModal(kind,id){
@@ -539,10 +560,15 @@ function bindView(v){
   $("#pick")&&($("#pick").onchange=e=>{S.profile=e.target.value;render()});
   $("#pick-item")&&($("#pick-item").onchange=e=>{S.itemSel=e.target.value;render()});
   const form=$("#entry");
-  if(form){form.onsubmit=ev=>{ev.preventDefault();saveEntry(false)};
-    $("#e-more")&&($("#e-more").onclick=()=>saveEntry(true));
-    $("#e-cancel")&&($("#e-cancel").onclick=()=>{S.edit=null;render()});
-    const it=$("#e-item");it&&it.addEventListener("change",()=>{const x=itemMap().get(it.value.trim().toLowerCase());if(x)it.value=x.name})}
+  if(form){form.onsubmit=ev=>{ev.preventDefault();saveEntry()};
+    $("#e-cancel")&&($("#e-cancel").onclick=()=>{S.edit=null;resetForm();render()});
+    $("#e-clear")&&($("#e-clear").onclick=()=>{resetForm();render()});
+    $("#e-addrow")&&($("#e-addrow").onclick=()=>{const rs=document.querySelectorAll("#e-rows .irow"),last=rs[rs.length-1];
+      $("#e-rows").insertAdjacentHTML("beforeend",itemRowHtml(blankRow(last?last.querySelector(".r-action").value:"Received"),rs.length,false));
+      const n=document.querySelectorAll("#e-rows .r-item");n[n.length-1].focus()});
+    form.addEventListener("click",ev=>{const b=ev.target.closest("[data-rmrow]");if(!b)return;const rs=document.querySelectorAll("#e-rows .irow");
+      if(rs.length>1)b.closest(".irow").remove();else{const r=b.closest(".irow");r.querySelector(".r-item").value="";r.querySelector(".r-qty").value="";r.querySelector(".r-quality").value=""}});
+    form.addEventListener("change",ev=>{if(!ev.target.classList.contains("r-item"))return;const x=itemMap().get(ev.target.value.trim().toLowerCase());if(x)ev.target.value=x.name})}
   $("#add-item")&&($("#add-item").onclick=()=>openItemModal(null));
   $("#add-person")&&($("#add-person").onclick=e=>openPersonModal(e.target.dataset.kind,null));
   $("#acc-new")&&($("#acc-new").onsubmit=ev=>{ev.preventDefault();createAccount()});
@@ -560,7 +586,7 @@ document.addEventListener("click",async e=>{
   if(t.dataset.group){const k=t.dataset.group;S.openGroups.has(k)?S.openGroups.delete(k):S.openGroups.add(k);render();return}
   if(t.dataset.edititem){openItemModal(t.dataset.edititem);return}
   if(t.dataset.editperson){openPersonModal(t.dataset.kind,t.dataset.editperson);return}
-  if(t.dataset.edit){S.edit=S.log.find(r=>r.id===t.dataset.edit)||null;render();window.scrollTo({top:0,behavior:"smooth"});return}
+  if(t.dataset.edit){S.edit=S.log.find(r=>r.id===t.dataset.edit)||null;resetForm();render();window.scrollTo({top:0,behavior:"smooth"});return}
   if(t.dataset.del){if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Sure?";setTimeout(()=>{if(t.isConnected){t.dataset.c="";t.textContent="Delete"}},3500);return}
     t.disabled=true;try{await db.collection("log").doc(t.dataset.del).delete()}catch(err){t.disabled=false;setStatus(errText(err),true)}}
 });
