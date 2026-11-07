@@ -56,6 +56,8 @@ textarea{min-height:60px;resize:vertical}
 .toolbar input,.toolbar select{width:auto;min-width:150px}
 .tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
 table{border-collapse:collapse;width:100%;min-width:720px}
+td.acts{white-space:nowrap;width:1%;position:sticky;right:0;background:var(--panel);box-shadow:-8px 0 8px -8px rgba(0,0,0,.6)}
+.acts-in{display:flex;gap:6px;flex-wrap:nowrap}
 th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
 th{font:600 14px/1.2 var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--panel);position:sticky;top:0}
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
@@ -333,7 +335,7 @@ function rowHtml(r,m){
   <td>${r.quality?`<span class="q-${esc(r.quality)}">${esc(r.quality)}</span>`:""}</td>
   <td style="color:var(--muted)">${cat==="?"?'<span class="out">? unknown</span>':esc(cat)}</td>
   <td class="num">${fmtN(r.qty)}</td><td>${esc(r.storage)}</td><td>${esc(r.handledBy)}</td><td class="notes">${notesCell(r.notes)}</td>
-  <td>${S.canWrite?`<div class="row"><button class="btn small" data-edit="${r.id}">Edit</button><button class="btn small danger" data-del="${r.id}">Delete</button></div>`:""}</td></tr>`;
+  <td class="acts">${S.canWrite?`<div class="acts-in"><button class="btn small" data-edit="${r.id}" title="Edit this entry">Edit</button><button class="btn small danger" data-del="${r.id}" title="Delete this entry">Delete</button></div>`:""}</td></tr>`;
 }
 function viewLog(){
   const {out,m}=logRows();
