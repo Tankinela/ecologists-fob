@@ -10,7 +10,7 @@ service cloud.firestore {
     function setupPath() { return /databases/$(database)/documents/setup/state; }
     function validMember(d) {
       return d.keys().hasOnly(['username', 'character', 'role', 'active', 'created'])
-        && d.username is string && d.role in ['admin', 'member', 'viewer'] && d.active is bool;
+        && d.username is string && d.role in ['admin', 'member', 'viewer', 'pending'] && d.active is bool;
     }
 
     // First-time setup: only possible while no admin exists yet.
@@ -25,7 +25,12 @@ service cloud.firestore {
       allow create: if validMember(request.resource.data) && (
         isAdmin() ||
         (signedIn() && request.auth.uid == uid && !exists(setupPath()) && existsAfter(setupPath())
-          && request.resource.data.role == 'admin' && request.resource.data.active == true));
+          && request.resource.data.role == 'admin' && request.resource.data.active == true) ||
+        // Self sign-up: lands as 'pending' with no access until an admin approves it.
+        (signedIn() && request.auth.uid == uid && exists(setupPath())
+          && request.resource.data.role == 'pending' && request.resource.data.active == false
+          && request.auth.token.email == request.resource.data.username + '@fob.local'
+          && request.resource.data.character is string && request.resource.data.character.size() <= 60));
       // Admins manage everyone except themselves (so you can't lock yourself out by accident).
       allow update: if isAdmin() && uid != request.auth.uid && validMember(request.resource.data)
         && request.resource.data.username == resource.data.username;

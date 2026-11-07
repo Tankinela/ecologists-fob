@@ -233,10 +233,11 @@ const involves=(r,name)=>people(r).includes(name);
 function isRuble(n){return (n||"").toLowerCase()==="ruble"}
 
 /* ---------- render shell ---------- */
+function pendingCount(){return S.isAdmin?S.members.filter(m=>m.role==="pending").length:0}
 function tabs(){return S.isAdmin?[...TABS,["accounts","Accounts"]]:TABS}
 function route(){const h=(location.hash||"").replace("#","");return tabs().some(t=>t[0]===h)?h:"log"}
 function renderTabs(){const cur=route(),n=chatUnread();
-  $("#tabs").innerHTML=tabs().map(([k,l])=>`<a href="#${k}" ${k===cur?'aria-current="page"':""}>${l}${k==="chat"&&n?`<span class="tabdot" title="${n} new message${n===1?"":"s"}"></span><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> (${n} new)</span>`:""}</a>`).join("");
+  $("#tabs").innerHTML=tabs().map(([k,l])=>`<a href="#${k}" ${k===cur?'aria-current="page"':""}>${l}${k==="accounts"&&pendingCount()?`<span class="tabdot" title="${pendingCount()} new account request${pendingCount()===1?"":"s"}"></span>`:""}${k==="chat"&&n?`<span class="tabdot" title="${n} new message${n===1?"":"s"}"></span><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> (${n} new)</span>`:""}</a>`).join("");
   document.title=(n?`(${n>99?"99+":n}) `:"")+"Ecologists Field Database"}
 function renderKpis(){
   const {st}=stockTable();let rub=0,items=0,kinds=0;
@@ -660,8 +661,16 @@ async function sendChat(){
 const ROLES=[["admin","Admin"],["member","Member (can edit)"],["viewer","Viewer (read only)"]];
 function viewAccounts(){
   if(!S.isAdmin)return `<div class="panel">Only admins can see this page.</div>`;
-  const rows=S.members.slice().sort((a,b)=>(a.username||"").localeCompare(b.username||""));
-  return `<form class="panel" id="acc-new" autocomplete="off"><h2>Create account</h2>
+  const rows=S.members.filter(m=>m.role!=="pending").sort((a,b)=>(a.username||"").localeCompare(b.username||""));
+  const pend=S.members.filter(m=>m.role==="pending").sort((a,b)=>(a.created||0)-(b.created||0));
+  return `${pend.length?`<div class="panel" style="border-color:#e5484d"><h2>New requests <span class="chip out">${pend.length} new</span></h2>
+   <p style="color:var(--muted);margin:0 0 12px">These people made an account themselves. Pick a role and approve them, or decline.</p>
+   <div class="tablewrap"><table><thead><tr><th>Username</th><th>Character</th><th>Asked</th><th>Role</th><th></th></tr></thead><tbody>
+   ${pend.map(m=>`<tr><td><b>${esc(m.username)}</b> <span class="chip out">New</span></td><td><input data-mchar="${m.id}" value="${esc(m.character)}" style="width:200px" data-combo="fob"></td><td>${m.created?fmtTs(m.created):""}</td>
+    <td><select data-prole="${m.id}" style="width:auto">${ROLES.map(([k,l])=>`<option value="${k}" ${k==="member"?"selected":""}>${l}</option>`).join("")}</select></td>
+    <td><div class="row"><button class="btn small primary" data-approve="${m.id}">Approve</button><button class="btn small danger" data-decline="${m.id}">Decline</button></div></td></tr>`).join("")}
+   </tbody></table></div></div>`:""}
+  <form class="panel" id="acc-new" autocomplete="off"><h2>Create account</h2>
    <p style="color:var(--muted);margin:0 0 12px">Pick a username and password, then give them to the FOB member. Usernames: 3–30 letters, numbers, dots, dashes or underscores.</p>
    <div class="grid">
     <div class="field"><label for="a-user">Username</label><input id="a-user" required autocomplete="off"></div>
@@ -869,6 +878,15 @@ document.addEventListener("click",async e=>{
   if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Sure? Click again";return}
   t.disabled=true;try{await db.collection("members").doc(m.id).delete();setMsg("acc-msg","ok",`Removed ${m.username}. If you also deleted them in Firebase, you can now create "${m.username}" again with a new password.`)}catch(err){t.disabled=false;setMsg("acc-msg","err",errText(err))}
 });
+document.addEventListener("click",async e=>{
+  const ap=e.target.closest("[data-approve]"),de=e.target.closest("[data-decline]");if(!ap&&!de)return;
+  const id=(ap||de).dataset.approve||(de&&de.dataset.decline),m=S.members.find(x=>x.id===id);if(!m)return;
+  if(de&&de.dataset.c!=="1"){de.dataset.c="1";de.textContent="Sure? Click again";return}
+  (ap||de).disabled=true;
+  try{if(ap){const role=($(`[data-prole="${id}"]`)||{}).value||"member";await db.collection("members").doc(id).update({role,active:true});setMsg("acc-msg","ok",`Approved ${m.username} as ${role}.`)}
+    else{await db.collection("members").doc(id).delete();setMsg("acc-msg","ok",`Declined ${m.username}.`)}}
+  catch(err){(ap||de).disabled=false;setMsg("acc-msg","err",errText(err))}
+});
 document.addEventListener("change",async e=>{
   const t=e.target;const id=t.dataset&&(t.dataset.mrole||t.dataset.mchar);if(!id)return;
   const upd=t.dataset.mrole?{role:t.value}:{character:t.value.trim()};
@@ -933,13 +951,39 @@ function loginForm(note){
   showGate(`${GATE_HEAD}<p style="margin-top:12px">${note?esc(note):"Log in with the username and password the admin gave you."}</p>
   <form id="g-form"><div class="field"><label for="g-user">Username</label><input id="g-user" autocomplete="username" autocapitalize="none" required></div>
   <div class="field"><label for="g-pass">Password</label><input id="g-pass" type="password" autocomplete="current-password" required></div>
-  <button class="btn primary" type="submit" style="width:100%">Log in</button><div class="msg" id="g-msg"></div></form>`);
+  <button class="btn primary" type="submit" style="width:100%">Log in</button><div class="msg" id="g-msg"></div></form>
+  <p style="margin:16px 0 0;text-align:center;font-size:14px">New here? <button class="link" type="button" id="g-reg">Create an account</button></p>`);
+  $("#g-reg").onclick=registerForm;
   $("#g-user").focus();
   if(gateNote){$("#g-msg").className="msg err";$("#g-msg").textContent=gateNote;gateNote=""}
   $("#g-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#g-msg"),u=$("#g-user").value;
     if(!validUser(u)){msg.className="msg err";msg.textContent="Wrong username or password.";return}
     msg.className="msg";msg.textContent="Logging in…";
     try{await auth.signInWithEmailAndPassword(toEmail(u),$("#g-pass").value)}catch(e){msg.className="msg err";msg.textContent=errText(e)}};
+}
+let registering=false;
+function registerForm(){
+  showGate(`${GATE_HEAD}<p style="margin-top:12px"><b>Create an account.</b> After you sign up, the admin has to approve you before you can see anything.</p>
+  <form id="g-form"><div class="field"><label for="g-user">Username</label><input id="g-user" autocomplete="username" autocapitalize="none" required></div>
+  <div class="field"><label for="g-char">Your character name</label><input id="g-char" required></div>
+  <div class="field"><label for="g-pass">Password (at least 6 characters)</label><input id="g-pass" type="password" autocomplete="new-password" minlength="6" required></div>
+  <div class="field"><label for="g-pass2">Password again</label><input id="g-pass2" type="password" autocomplete="new-password" minlength="6" required></div>
+  <button class="btn primary" type="submit" style="width:100%">Create account</button><div class="msg" id="g-msg"></div></form>
+  <p style="margin:16px 0 0;text-align:center;font-size:14px">Already have one? <button class="link" type="button" id="g-back">Log in</button></p>`);
+  $("#g-back").onclick=()=>loginForm();$("#g-user").focus();
+  $("#g-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#g-msg"),u=$("#g-user").value.trim().toLowerCase(),p=$("#g-pass").value,ch=$("#g-char").value.trim();
+    const err=t=>{msg.className="msg err";msg.textContent=t};
+    if(!validUser(u))return err("Username: 3–30 letters, numbers, dots, dashes or underscores, no spaces.");
+    if(!ch)return err("Fill in your character name.");
+    if(ch.length>60)return err("Character name is too long.");
+    if(p.length<6)return err("The password needs at least 6 characters.");
+    if(p!==$("#g-pass2").value)return err("The two passwords don't match.");
+    msg.className="msg";msg.textContent="Creating…";registering=true;
+    try{const cred=await auth.createUserWithEmailAndPassword(toEmail(u),p);
+      await db.collection("members").doc(cred.user.uid).set({username:u,character:ch,role:"pending",active:false,created:Date.now()});
+      registering=false;onUser(cred.user)}
+    catch(e){registering=false;const t=e.code==="permission-denied"?"Sign-ups aren't switched on yet. Ask the admin.":errText(e);
+      if(auth.currentUser){gateNote=t;try{await auth.currentUser.delete()}catch(_){await auth.signOut()}}else err(t)}};
 }
 function setupForm(){
   showGate(`${GATE_HEAD}<p style="margin-top:12px"><b>First-time setup.</b> Create the admin account. This only shows once — after this, nobody else can become admin by themselves.</p>
@@ -965,10 +1009,13 @@ function onUser(user){
   if(meUnsub){meUnsub();meUnsub=null}
   if(!user){stopData();S.me=null;S.isAdmin=S.canWrite=false;
     db.doc("setup/state").get().then(s=>s.exists?loginForm():setupForm()).catch(()=>loginForm());return}
-  if(settingUp)return;
+  if(settingUp||registering)return;
   showGate(`${GATE_HEAD}<p style="margin-top:12px">Checking your access…</p>`);
   meUnsub=db.doc("members/"+user.uid).onSnapshot(s=>{
     const m=s.exists?{id:s.id,...s.data()}:null;
+    if(m&&m.role==="pending"){stopData();S.me=null;
+      showGate(`${GATE_HEAD}<p style="margin-top:12px"><b>Waiting for approval.</b> Your account <b>${esc(m.username)}</b> was created. The admin will let you in soon — this page opens by itself once you're approved.</p><button class="btn" id="g-out">Log out</button>`);
+      $("#g-out").onclick=()=>auth.signOut();return}
     if(!m||!m.active){stopData();S.me=null;
       showGate(`${GATE_HEAD}<p style="margin-top:12px">${m?"Your account has been locked out. Ask the admin if this is a mistake.":"This account has no access. Ask the admin."}</p><button class="btn" id="g-out">Log out</button>`);
       $("#g-out").onclick=()=>auth.signOut();return}
