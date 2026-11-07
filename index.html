@@ -763,7 +763,7 @@ function randomPass(){const a="abcdefghjkmnpqrstuvwxyz23456789",r=crypto.getRand
 function openAccountModal(){
   openModal(`<form id="m-form" autocomplete="off"><h2>Your account</h2>
    <p style="color:var(--muted);margin:0 0 12px">Logged in as <b>${esc(S.me.username)}</b> · role: ${esc(S.me.role)}</p>
-   <label class="row" style="margin:0 0 14px"><input type="checkbox" id="p-rain" style="width:auto" ${Rain.on()?"checked":""}> Matrix rain on the sides of the page</label>
+   <label class="row" style="margin:0 0 14px"><input type="checkbox" id="p-rain" style="width:auto" ${Rain.on()?"checked":""}> Matrix numbers on the sides of the page</label>
    <div class="grid"><div class="field"><label for="p-cur">Current password</label><input id="p-cur" type="password" autocomplete="current-password" required></div>
    <div class="field"><label for="p-new">New password</label><input id="p-new" type="password" autocomplete="new-password" minlength="6" required></div></div>
    <div class="row" style="margin-top:12px"><button class="btn primary" type="submit">Change password</button><button class="btn" type="button" id="m-cancel">Close</button></div>
@@ -1066,27 +1066,27 @@ function onUser(user){
     render();
   },err=>loginForm("Couldn't check your access. Try logging in again."));
 }
-/* ---------- Matrix rain in the side margins ---------- */
+/* ---------- Matrix digits in the side margins: appear, glow, fade ---------- */
 const Rain=(()=>{
-  const cv=document.getElementById("rain"),ctx=cv.getContext("2d"),FS=15,CW=17,BG="19,22,15";
-  let cols=[],W=0,H=0,dpr=1,raf=0,last=0,running=false;
+  const cv=document.getElementById("rain"),ctx=cv.getContext("2d"),FS=15,CW=17,RH=19,BG="19,22,15";
+  let cells=[],W=0,H=0,dpr=1,raf=0,last=0,running=false,rate=0;
   const reduced=()=>window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
   const on=()=>{try{return localStorage.getItem("fob-rain")!=="off"}catch(_){return true}};
   function layout(){dpr=Math.min(2,window.devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle=`rgb(${BG})`;ctx.fillRect(0,0,W,H);
     const r=(document.querySelector("#app:not(.hidden)")?document.querySelector("#app"):document.querySelector("#gate .card")||document.body).getBoundingClientRect();
-    const L=Math.max(0,r.left-10),R=Math.min(W,r.right+10);cols=[];
-    for(let x=4;x+CW<=L;x+=CW)cols.push(mk(x));for(let x=Math.ceil((R+4)/CW)*CW;x+CW<=W;x+=CW)cols.push(mk(x))}
-  function mk(x){return {x,y:-Math.random()*H,sp:0.22+Math.random()*0.45,prev:null}}
-  function frame(t){raf=requestAnimationFrame(frame);if(t-last<85)return;last=t;
-    ctx.fillStyle=`rgba(${BG},0.11)`;ctx.fillRect(0,0,W,H);ctx.font=`600 ${FS}px ui-monospace,Consolas,monospace`;ctx.textBaseline="top";
-    for(const c of cols){
-      if(c.prev!=null&&c.y>0){ctx.shadowBlur=0;ctx.fillStyle="rgba(64,220,110,.85)";ctx.fillText(c.prev,c.x,c.y-FS)}
-      const ch=String((Math.random()*10)|0);c.prev=ch;
-      ctx.shadowColor="#5dff8f";ctx.shadowBlur=10;ctx.fillStyle="#d6ffe2";ctx.fillText(ch,c.x,c.y);
-      c.y+=FS*c.sp;if(c.y>H+FS*2&&Math.random()>0.96){c.y=-FS*(2+Math.random()*20);c.sp=0.22+Math.random()*0.45;c.prev=null}}
+    const L=Math.max(0,r.left-10),R=Math.min(W,r.right+10),xs=[];cells=[];
+    for(let x=4;x+CW<=L;x+=CW)xs.push(x);for(let x=Math.ceil((R+4)/CW)*CW;x+CW<=W;x+=CW)xs.push(x);
+    for(const x of xs)for(let y=4;y+RH<=H;y+=RH)cells.push([x,y]);
+    rate=cells.length*0.012}
+  function frame(t){raf=requestAnimationFrame(frame);if(t-last<45)return;last=t;
+    ctx.shadowBlur=0;ctx.fillStyle=`rgba(${BG},0.07)`;ctx.fillRect(0,0,W,H);
+    ctx.font=`600 ${FS}px ui-monospace,Consolas,monospace`;ctx.textBaseline="top";ctx.shadowColor="#5dff8f";
+    let n=Math.floor(rate)+(Math.random()<rate%1?1:0);
+    while(n--){const c=cells[(Math.random()*cells.length)|0],bright=Math.random()<0.25;
+      ctx.shadowBlur=bright?12:6;ctx.fillStyle=bright?"#d6ffe2":"rgba(70,230,120,.9)";ctx.fillText(String((Math.random()*10)|0),c[0]+3,c[1]+2)}
     ctx.shadowBlur=0}
-  function start(){if(running||!on()||reduced()||document.hidden)return;layout();if(!cols.length)return;running=true;last=0;raf=requestAnimationFrame(frame)}
+  function start(){if(running||!on()||reduced()||document.hidden)return;layout();if(!cells.length)return;running=true;last=0;raf=requestAnimationFrame(frame)}
   function stop(clear){cancelAnimationFrame(raf);running=false;if(clear){ctx.clearRect(0,0,W,H)}}
   let rt=0;addEventListener("resize",()=>{clearTimeout(rt);rt=setTimeout(()=>{stop();start()},150)});
   document.addEventListener("visibilitychange",()=>document.hidden?stop():start());
