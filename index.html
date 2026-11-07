@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ecologists Field Database</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a field-station terminal — dark moss panels, a left-aligned tab rail, dense scannable tables with semantic chips. */
+:root{
+  --bg:#13160f; --panel:#1b1f16; --panel-2:#22281b; --line:#323c27; --text:#e4e0cb; --muted:#9c9b86;
+  --accent:#b9c86c; --accent-ink:#1a1f10; --good:#83b86c; --bad:#d6684f; --warn:#d9a94b; --info:#79a9c9;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif; --body:"Barlow","Segoe UI",Arial,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 var(--body)}
+a{color:var(--accent)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1280px;margin:0 auto;padding:16px}
+header.top{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:12px}
+h1{font:700 30px/1 var(--display);letter-spacing:.04em;text-transform:uppercase;margin:0;text-wrap:balance}
+h1 small{display:block;font:500 13px/1.3 var(--body);letter-spacing:.02em;text-transform:none;color:var(--muted);margin-top:4px}
+.kpis{display:flex;flex-wrap:wrap;gap:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;min-width:120px}
+.kpi b{display:block;font:600 22px/1.1 var(--display);font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--muted)}
+nav.tabs{display:flex;flex-wrap:wrap;gap:4px;margin:14px 0}
+nav.tabs a{font:600 16px/1 var(--display);letter-spacing:.05em;text-transform:uppercase;text-decoration:none;color:var(--muted);padding:9px 14px;border-radius:5px;border:1px solid transparent}
+nav.tabs a:hover{color:var(--text);border-color:var(--line)}
+nav.tabs a[aria-current="page"]{background:var(--accent);color:var(--accent-ink)}
+.status{font-size:13px;color:var(--muted);margin:6px 0}
+.status.err{color:var(--bad)}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:14px}
+.panel h2{font:600 19px/1.1 var(--display);letter-spacing:.05em;text-transform:uppercase;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
+.field{display:flex;flex-direction:column;gap:3px}
+.field label{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.field.wide{grid-column:1/-1}
+input,select,textarea{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:7px 9px;min-width:0;width:100%}
+textarea{min-height:60px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{background:var(--panel-2);border:1px solid var(--line);border-radius:5px;padding:7px 13px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.danger{color:var(--bad)}
+.btn.small{padding:3px 8px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.msg{font-size:13px;margin-top:8px}
+.msg.err{color:var(--bad)} .msg.ok{color:var(--good)}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.toolbar input,.toolbar select{width:auto;min-width:150px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;min-width:720px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font:600 14px/1.2 var(--display);letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--panel);position:sticky;top:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:hover td{background:#1c2117}
+td{white-space:nowrap}
+td.notes{color:var(--muted);max-width:340px;min-width:180px;white-space:normal}
+.toolbar input[type=checkbox]{min-width:0}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:1px 8px;border-radius:999px;border:1px solid currentColor}
+.in{color:var(--good)} .out{color:var(--bad)}
+.q-Pristine{color:var(--warn)} .q-High{color:var(--info)} .q-Normal{color:var(--muted)}
+.st-Alive{color:var(--good)} .st-MIA{color:var(--warn)} .st-KIA{color:var(--bad)} .st-Retired{color:var(--muted)}
+.tm-Doctor{color:var(--bad)} .tm-Military{color:var(--good)} .tm-Researcher,.tm-Professor{color:var(--info)}
+.stock-pos{color:var(--good);font-weight:600} .stock-neg{color:var(--bad);font-weight:700} .stock-zero{color:#5f6153}
+.link{background:none;border:0;padding:0;text-align:left;color:var(--text);cursor:pointer;text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.link:hover{text-decoration-color:var(--accent)}
+.group td{background:var(--panel-2);cursor:pointer;font-weight:600}
+.group td .chev{display:inline-block;width:14px;color:var(--accent)}
+.thumb{width:40px;height:40px;border-radius:5px;background:#34352e;object-fit:contain;display:block}
+.thumb.ph{display:grid;place-items:center;color:#6a6b5c;font-size:11px}
+.profile{display:grid;grid-template-columns:minmax(220px,1fr) minmax(220px,1fr) 240px;gap:14px}
+@media (max-width:820px){.profile{grid-template-columns:1fr}}
+dl.info{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}
+dl.info dt{color:var(--muted);font-size:13px}
+dl.info dd{margin:0}
+.photo{width:100%;aspect-ratio:1;border-radius:8px;background:#34352e;object-fit:contain;display:grid;place-items:center;color:#6a6b5c}
+.empty{padding:28px;text-align:center;color:var(--muted)}
+.overlay{position:fixed;inset:0;background:rgba(5,7,3,.72);display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto;z-index:20}
+.overlay.open{display:flex}
+.modal{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;width:min(640px,100%)}
+.modal h2{font:600 22px/1.1 var(--display);text-transform:uppercase;letter-spacing:.05em;margin:0 0 12px}
+.split{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:700px){.split{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.gate{min-height:100vh;display:grid;place-items:center;padding:24px}
+.gate .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:24px;width:min(380px,100%)}
+.gate h1{margin-bottom:6px}
+.gate p{color:var(--muted);margin:0 0 16px;font-size:14px}
+.gate .field{margin-bottom:10px}
+.whoami{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted);justify-content:flex-end;width:100%}
+.hidden{display:none!important}
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+</head>
+<body>
+<div class="gate hidden" id="gate"><div class="card" id="gate-card"></div></div>
+<div class="wrap hidden" id="app">
+  <header class="top">
+    <div class="whoami" id="whoami"></div>
+    <h1>Ecologists Field Database<small>Russo-Belarussian Ecologist Mission · FOB stores, stalkers and staff</small></h1>
+    <div class="kpis" id="kpis"></div>
+  </header>
+  <nav class="tabs" id="tabs" aria-label="Sections"></nav>
+  <div class="status" id="status">Connecting to the database…</div>
+  <main id="view"></main>
+</div>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true"><div class="modal" id="modal"></div></div>
+
+<script>
+"use strict";
+const TABS=[["log","Storage Log"],["stock","In Storage"],["items","Items"],["stalkers","Stalkers"],["fob","FOB Team"],["profile","Character Profile"],["item","Item Profile"],["lists","Lists"]];
+const DEFAULT_LISTS={actions:["Received","Given out"],categories:["Money","Ingredient","Crafted","Mutant Part","Artifact","Weapon","Ammo","Armor","Medical","Tool","Food","Misc"],storages:["Green Crate","Ecologists Trader"],factions:["Loner","Ecologist","Duty","Freedom","UN Military","Bandit","Mercenary","Monolith"],statuses:["Alive","MIA","KIA","Retired"],ranks:["Lead","Sr.","Sr. Sgt.","Sr. Pvt.","Cst.","Pvt."],teams:["Researcher","Doctor","Professor","Military"],qualities:["Normal","High","Pristine"],sources:["Supply","Chest check","Crafting"]};
+const S={log:[],items:[],stalkers:[],fob:[],lists:DEFAULT_LISTS,ready:{log:false,items:false,stalkers:false,fob:false},
+  canWrite:false,canEdit:false,isAdmin:false,flash:{},me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
+let db=null,auth=null,assets=null,unsubs=[];
+const DOMAIN="fob.local";
+const toEmail=u=>u.trim().toLowerCase()+"@"+DOMAIN;
+const validUser=u=>/^[a-z0-9._-]{3,30}$/i.test(u.trim());
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nf=new Intl.NumberFormat("cs-CZ");
+const fmtN=n=>nf.format(n||0);
+const pad=n=>String(n).padStart(2,"0");
+const fmtTs=t=>{if(!t)return"";const d=new Date(t);return`${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const fmtDay=t=>{if(!t)return"";const d=new Date(t);return`${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`};
+const toLocalInput=t=>{const d=new Date(t);return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`};
+const byName=(a,b)=>(a.name||"").localeCompare(b.name||"",undefined,{sensitivity:"base",numeric:true});
+const L=k=>(S.lists&&Array.isArray(S.lists[k])&&S.lists[k].length)?S.lists[k]:DEFAULT_LISTS[k];
+const photoUrl=p=>p&&/^(data:|https?:|blob:)/.test(p)?p:"";
+
+/* ---------- derived data ---------- */
+function itemMap(){const m=new Map();for(const i of S.items)m.set((i.name||"").toLowerCase(),i);return m}
+function categoryOf(name,m){const i=(m||itemMap()).get((name||"").toLowerCase());return i?(i.category||""):"?"}
+function stockTable(){
+  const st=new Map(),stor=L("storages");
+  const get=n=>{const k=(n||"").toLowerCase();if(!st.has(k))st.set(k,{name:n,by:{},rec:0,out:0,count:0});return st.get(k)};
+  for(const i of S.items)get(i.name);
+  for(const r of S.log){const e=get(r.item),q=Number(r.qty)||0,s=r.storage||"";e.count++;
+    if(r.action==="Received"){e.rec+=q;e.by[s]=(e.by[s]||0)+q}else if(r.action==="Given out"){e.out+=q;e.by[s]=(e.by[s]||0)-q}}
+  for(const e of st.values())e.total=e.rec-e.out;
+  return {st,stor};
+}
+function isRuble(n){return (n||"").toLowerCase()==="ruble"}
+
+/* ---------- render shell ---------- */
+function tabs(){return S.isAdmin?[...TABS,["accounts","Accounts"]]:TABS}
+function route(){const h=(location.hash||"").replace("#","");return tabs().some(t=>t[0]===h)?h:"log"}
+function renderTabs(){const cur=route();$("#tabs").innerHTML=tabs().map(([k,l])=>`<a href="#${k}" ${k===cur?'aria-current="page"':""}>${l}</a>`).join("")}
+function renderKpis(){
+  const {st}=stockTable();let rub=0,items=0,kinds=0;
+  for(const e of st.values()){if(isRuble(e.name))rub=e.total;else if(e.total>0){items+=e.total;kinds++}}
+  $("#kpis").innerHTML=`<div class="kpi"><b>${fmtN(rub)}</b><span>Rubles in storage</span></div>
+  <div class="kpi"><b>${fmtN(items)}</b><span>Items in storage (${kinds} kinds)</span></div>
+  <div class="kpi"><b>${fmtN(S.log.length)}</b><span>Log entries</span></div>`;
+}
+function render(){
+  renderTabs();renderKpis();
+  const v=route(),el=$("#view");
+  const fn={log:viewLog,stock:viewStock,items:viewItems,stalkers:viewStalkers,fob:viewFob,profile:viewProfile,item:viewItem,lists:viewLists,accounts:viewAccounts}[v];
+  el.innerHTML=fn();
+  bindView(v);applyFlash();
+}
+function setStatus(t,err){const s=$("#status");s.textContent=t;s.className="status"+(err?" err":"")}
+
+/* ---------- Storage Log ---------- */
+function datalists(){
+  const chars=[...L("sources"),...S.stalkers.map(s=>s.name).sort((a,b)=>a.localeCompare(b))];
+  return `<datalist id="dl-chars">${chars.map(c=>`<option value="${esc(c)}">`).join("")}</datalist>
+  <datalist id="dl-stalkers">${S.stalkers.slice().sort(byName).map(s=>`<option value="${esc(s.name)}">`).join("")}</datalist>
+  <datalist id="dl-items">${S.items.slice().sort(byName).map(i=>`<option value="${esc(i.name)}">`).join("")}</datalist>
+  <datalist id="dl-fob">${S.fob.slice().sort(byName).map(f=>`<option value="${esc(f.name)}">`).join("")}</datalist>`;
+}
+function opts(list,sel,blank){return (blank?`<option value="">${esc(blank)}</option>`:"")+list.map(o=>`<option ${o===sel?"selected":""}>${esc(o)}</option>`).join("")}
+function entryForm(){
+  if(!S.canWrite)return `<div class="panel"><span class="badge">View only</span> You can read the database but not add entries. Ask the admin to change your role to Member.</div>`;
+  const e=S.edit||S.draft||{handledBy:(S.me&&S.me.character)||""};const editing=!!S.edit;
+  return `<form class="panel" id="entry" autocomplete="off">
+  <h2>${editing?"Edit entry":"New entry"}</h2>${datalists()}
+  <div class="grid">
+    <div class="field"><label for="e-ts">Date &amp; time</label><input id="e-ts" type="datetime-local" value="${toLocalInput(e.ts||Date.now())}"></div>
+    <div class="field"><label for="e-char">Character / source</label><input id="e-char" list="dl-chars" value="${esc(e.character||"")}" required></div>
+    <div class="field"><label for="e-with">With (2nd stalker)</label><input id="e-with" list="dl-stalkers" value="${esc(e.with||"")}"></div>
+    <div class="field"><label for="e-action">Action</label><select id="e-action">${opts(L("actions"),e.action||"Received")}</select></div>
+    <div class="field"><label for="e-item">Item</label><input id="e-item" list="dl-items" value="${esc(e.item||"")}" required></div>
+    <div class="field"><label for="e-quality">Quality</label><select id="e-quality">${opts(L("qualities"),e.quality||"","—")}</select></div>
+    <div class="field"><label for="e-qty">Qty</label><input id="e-qty" type="number" min="1" step="1" value="${esc(e.qty||"")}" required></div>
+    <div class="field"><label for="e-storage">Storage</label><select id="e-storage">${opts(L("storages"),e.storage||"","—")}</select></div>
+    <div class="field"><label for="e-by">Handled by (FOB)</label><input id="e-by" list="dl-fob" value="${esc(e.handledBy||"")}"></div>
+    <div class="field wide"><label for="e-notes">Notes</label><input id="e-notes" value="${esc(e.notes||"")}"></div>
+  </div>
+  <div class="row" style="margin-top:10px">
+    <button class="btn primary" type="submit" id="e-save">${editing?"Save changes":"Save entry"}</button>
+    ${editing?`<button class="btn" type="button" id="e-cancel">Cancel</button>`:`<button class="btn" type="button" id="e-more">Save &amp; add another item to this trade</button>`}
+  </div>
+  <div class="msg" id="e-msg"></div>
+  </form>`;
+}
+function logRows(){
+  const m=itemMap(),f=S.f,q=f.q.toLowerCase();
+  let rows=S.log.filter(r=>(!f.storage||r.storage===f.storage)&&(!f.action||r.action===f.action)&&
+    (!q||[r.character,r.with,r.item,r.handledBy,r.notes].some(x=>(x||"").toLowerCase().includes(q))));
+  rows.sort((a,b)=>(b.ts||0)-(a.ts||0)||(a.item||"").localeCompare(b.item||""));
+  const out=[];let i=0;
+  while(i<rows.length){const r=rows[i];
+    if(r.character==="Chest check"){let j=i;while(j<rows.length&&rows[j].character==="Chest check"&&rows[j].ts===r.ts)j++;
+      const grp=rows.slice(i,j);if(grp.length>2){out.push({group:true,key:"cc"+r.ts,rows:grp});i=j;continue}}
+    out.push(r);i++}
+  return {out,m};
+}
+function rowHtml(r,m){
+  const cat=categoryOf(r.item,m),act=r.action==="Received"?"in":"out";
+  return `<tr>
+  <td>${fmtTs(r.ts)}</td><td><button class="link" data-prof="${esc(r.character)}">${esc(r.character)}</button></td>
+  <td>${r.with?`<button class="link" data-prof="${esc(r.with)}">${esc(r.with)}</button>`:""}</td>
+  <td><span class="chip ${act}">${esc(r.action)}</span></td>
+  <td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>
+  <td>${r.quality?`<span class="q-${esc(r.quality)}">${esc(r.quality)}</span>`:""}</td>
+  <td style="color:var(--muted)">${cat==="?"?'<span class="out">? unknown</span>':esc(cat)}</td>
+  <td class="num">${fmtN(r.qty)}</td><td>${esc(r.storage)}</td><td>${esc(r.handledBy)}</td><td class="notes">${esc(r.notes)}</td>
+  <td>${S.canWrite?`<div class="row"><button class="btn small" data-edit="${r.id}">Edit</button><button class="btn small danger" data-del="${r.id}">Delete</button></div>`:""}</td></tr>`;
+}
+function viewLog(){
+  const {out,m}=logRows();
+  return entryForm()+`<div id="list-slot">`+logList(out,m)+`</div>`;
+}
+function logList(out,m){
+  let body="";
+  for(const o of out){
+    if(o.group){const open=S.openGroups.has(o.key),tot=o.rows.reduce((s,r)=>s+(Number(r.qty)||0),0);
+      body+=`<tr class="group" data-group="${o.key}"><td colspan="12"><span class="chev">${open?"▾":"▸"}</span> ${fmtTs(o.rows[0].ts)} · Chest check · ${o.rows.length} items (${fmtN(tot)} pcs) · ${esc(o.rows[0].storage||"")} — ${open?"click to fold":"click to open"}</td></tr>`;
+      if(open)body+=o.rows.slice().sort((a,b)=>(a.item||"").localeCompare(b.item||"",undefined,{numeric:true})).map(r=>rowHtml(r,m)).join("");}
+    else body+=rowHtml(o,m);
+  }
+  return `<div class="toolbar">
+    <input id="f-q" type="search" placeholder="Search name, item, notes…" value="${esc(S.f.q)}" aria-label="Search the log">
+    <select id="f-storage" aria-label="Storage">${opts(L("storages"),S.f.storage,"All storages")}</select>
+    <select id="f-action" aria-label="Action">${opts(L("actions"),S.f.action,"All actions")}</select>
+  </div>
+  <div class="tablewrap"><table><thead><tr><th>Date</th><th>Character</th><th>With</th><th>Action</th><th>Item</th><th>Quality</th><th>Category</th><th class="num">Qty</th><th>Storage</th><th>Handled by</th><th>Notes</th><th></th></tr></thead>
+  <tbody>${body||`<tr><td colspan="12" class="empty">${S.ready.log?"No entries match.":"Loading entries…"}</td></tr>`}</tbody></table></div>`;
+}
+function readEntry(){
+  const v=id=>$("#"+id).value.trim();
+  const ts=new Date($("#e-ts").value).getTime();
+  return {ts:isNaN(ts)?Date.now():ts,character:v("e-char"),with:v("e-with"),action:v("e-action"),item:v("e-item"),quality:v("e-quality"),
+    qty:Number(v("e-qty")),storage:v("e-storage"),handledBy:v("e-by"),notes:v("e-notes")};
+}
+async function saveEntry(keep){
+  const msg=$("#e-msg"),e=readEntry();msg.className="msg";
+  if(!e.character||!e.item||!(e.qty>0)){msg.className="msg err";msg.textContent="Fill in Character, Item and a quantity above 0.";return}
+  const it=itemMap().get(e.item.toLowerCase());
+  if(!it){msg.className="msg err";msg.innerHTML=`“${esc(e.item)}” is not in the item list. <button class="btn small" type="button" id="e-additem">Add it to Items</button>`;
+    $("#e-additem").onclick=()=>openItemModal(null,e.item);return}
+  e.item=it.name;
+  const btns=[...document.querySelectorAll("#entry button")];btns.forEach(b=>b.disabled=true);
+  try{
+    if(S.edit){e.by=S.edit.by||"";await db.collection("log").doc(S.edit.id).set(e);S.edit=null;S.draft=null}
+    else{e.by=S.me?S.me.username:"";await db.collection("log").add(e);S.draft=keep?{...e,item:"",qty:"",quality:"",notes:""}:null}
+    render();setMsg("e-msg","ok",keep?"Saved. Add the next item of this trade.":"Saved.")
+    if(keep)$("#e-item")?.focus();
+  }catch(err){btns.forEach(b=>b.disabled=false);msg.className="msg err";msg.textContent=errText(err)}
+}
+function errText(err){const c=err&&err.code;
+  if(c==="permission-denied")return"You don't have permission to change the database. Ask the admin to check your role.";
+  if(c==="resource-exhausted")return"The free daily limit is used up. It resets at midnight (US Pacific time).";
+  if(c==="auth/email-already-in-use")return"That username is already taken.";
+  if(c==="auth/weak-password")return"The password needs at least 6 characters.";
+  if(c==="auth/wrong-password"||c==="auth/invalid-credential"||c==="auth/invalid-login-credentials"||c==="auth/user-not-found")return"Wrong username or password.";
+  if(c==="auth/too-many-requests")return"Too many tries. Wait a few minutes and try again.";
+  if(c==="auth/network-request-failed"||c==="unavailable")return"No connection. Check your internet and try again.";
+  return"Something went wrong"+(c?` (${c})`:"")+". Try again in a moment."}
+
+/* ---------- In Storage ---------- */
+function viewStock(){
+  const {st,stor}=stockTable(),m=itemMap(),f=S.f,q=f.q.toLowerCase();
+  let rows=[...st.values()].filter(e=>(!f.onlyStock||e.total!==0)&&(!f.cat||categoryOf(e.name,m)===f.cat)&&(!q||e.name.toLowerCase().includes(q)));
+  rows.sort(byName);
+  const cell=n=>`<td class="num ${n>0?"stock-pos":n<0?"stock-neg":"stock-zero"}">${fmtN(n)}</td>`;
+  return `<div class="toolbar">
+    <input id="f-q" type="search" placeholder="Search items…" value="${esc(f.q)}" aria-label="Search items">
+    <select id="f-cat" aria-label="Category">${opts(L("categories"),f.cat,"All categories")}</select>
+    <label class="row"><input type="checkbox" id="f-only" style="width:auto" ${f.onlyStock?"checked":""}> Only items we have</label>
+  </div>
+  <div class="tablewrap"><table><thead><tr><th></th><th>Item</th><th>Category</th>${stor.map(s=>`<th class="num">${esc(s)}</th>`).join("")}<th class="num">In stock</th><th class="num">Received</th><th class="num">Given out</th></tr></thead><tbody>
+  ${rows.map(e=>{const it=m.get(e.name.toLowerCase());return`<tr><td>${thumb(it)}</td><td><button class="link" data-item="${esc(e.name)}">${esc(e.name)}</button></td><td style="color:var(--muted)">${esc(categoryOf(e.name,m))}</td>
+    ${stor.map(s=>cell(e.by[s]||0)).join("")}${cell(e.total)}<td class="num">${fmtN(e.rec)}</td><td class="num">${fmtN(e.out)}</td></tr>`}).join("")||`<tr><td colspan="9" class="empty">Nothing matches.</td></tr>`}
+  </tbody></table></div>`;
+}
+function thumb(rec){const u=rec&&photoUrl(rec.photo);return u?`<img class="thumb" src="${esc(u)}" alt="">`:`<div class="thumb ph">—</div>`}
+
+/* ---------- Items ---------- */
+function viewItems(){
+  const {st}=stockTable(),q=S.f.q.toLowerCase(),cat=S.f.cat;
+  const rows=S.items.filter(i=>(!cat||i.category===cat)&&(!q||(i.name||"").toLowerCase().includes(q))).sort(byName);
+  return `<div class="toolbar">
+    <input id="f-q" type="search" placeholder="Search items…" value="${esc(S.f.q)}" aria-label="Search items">
+    <select id="f-cat" aria-label="Category">${opts(L("categories"),cat,"All categories")}</select>
+    ${S.canWrite?`<button class="btn primary" id="add-item">Add item</button>`:""}
+    <span class="badge">${S.items.length} items</span>
+  </div>
+  <div class="tablewrap"><table><thead><tr><th>Photo</th><th>Item</th><th>Category</th><th class="num">In stock</th><th class="num">Times logged</th><th>Notes</th><th></th></tr></thead><tbody>
+  ${rows.map(i=>{const e=st.get((i.name||"").toLowerCase())||{total:0,count:0};return`<tr><td>${thumb(i)}</td><td><button class="link" data-item="${esc(i.name)}">${esc(i.name)}</button></td><td>${esc(i.category)}</td>
+  <td class="num ${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}">${fmtN(e.total)}</td><td class="num">${e.count}</td><td class="notes">${esc(i.notes)}</td>
+  <td>${S.canWrite?`<button class="btn small" data-edititem="${i.id}">Edit</button>`:""}</td></tr>`}).join("")||`<tr><td colspan="7" class="empty">${S.ready.items?"No items match.":"Loading items…"}</td></tr>`}
+  </tbody></table></div>`;
+}
+
+/* ---------- People ---------- */
+const STALKER_FIELDS=[["name","Name"],["callsign","Callsign"],["player","Player (Discord)"],["faction","Faction","factions"],["rank","Rank"],["status","Status","statuses"],["lastSeen","Last seen (date)"],["location","Last known location"],["notes","Notes / background","",true]];
+const FOB_FIELDS=[["name","Name"],["callsign","Callsign"],["player","Player (Discord)"],["rank","Rank","ranks"],["team","Team","teams"],["status","Status","statuses"],["lastSeen","Last seen (date)"],["location","Last known location"],["notes","Notes / background","",true]];
+function countFor(name,field){let n=0;for(const r of S.log){if(field==="handledBy"?r.handledBy===name:(r.character===name||r.with===name))n++}return n}
+function viewPeople(kind){
+  const list=kind==="fob"?S.fob:S.stalkers,q=S.f.q.toLowerCase();
+  const rows=list.filter(p=>!q||[p.name,p.callsign,p.player,p.notes].some(x=>(x||"").toLowerCase().includes(q))).sort(byName);
+  const fob=kind==="fob";
+  return `<div class="toolbar">
+    <input id="f-q" type="search" placeholder="Search names, callsigns, notes…" value="${esc(S.f.q)}" aria-label="Search people">
+    ${S.canWrite?`<button class="btn primary" id="add-person" data-kind="${kind}">${fob?"Add FOB member":"Add stalker"}</button>`:""}
+    <span class="badge">${list.length} ${fob?"members":"stalkers"}</span>
+  </div>
+  <div class="tablewrap"><table><thead><tr><th>Photo</th><th>Name</th><th>Callsign</th><th>Player</th>${fob?"<th>Rank</th><th>Team</th>":"<th>Faction</th>"}<th>Status</th><th>Last seen</th><th>Location</th><th class="num">${fob?"Entries handled":"Log entries"}</th><th>Notes</th><th></th></tr></thead><tbody>
+  ${rows.map(p=>`<tr><td>${thumb(p)}</td><td>${fob?esc(p.name):`<button class="link" data-prof="${esc(p.name)}">${esc(p.name)}</button>`}</td><td>${esc(p.callsign)}</td><td>${esc(p.player)}</td>
+   ${fob?`<td>${esc(p.rank)}</td><td><span class="tm-${esc(p.team)}" style="font-weight:600">${esc(p.team)}</span></td>`:`<td>${esc(p.faction)}</td>`}
+   <td>${p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:""}</td><td>${esc(p.lastSeen)}</td><td>${esc(p.location)}</td>
+   <td class="num">${countFor(p.name,fob?"handledBy":"char")}</td><td class="notes">${esc(p.notes)}</td>
+   <td>${S.canWrite?`<button class="btn small" data-editperson="${p.id}" data-kind="${kind}">Edit</button>`:""}</td></tr>`).join("")||`<tr><td colspan="12" class="empty">${S.ready[kind]?"Nobody matches.":"Loading…"}</td></tr>`}
+  </tbody></table></div>`;
+}
+const viewStalkers=()=>viewPeople("stalkers"),viewFob=()=>viewPeople("fob");
+
+/* ---------- Profiles ---------- */
+function historyTable(rows,cols){
+  const m=itemMap();
+  return `<div class="tablewrap"><table><thead><tr>${cols.map(c=>`<th${c[2]?' class="num"':""}>${c[0]}</th>`).join("")}</tr></thead><tbody>
+  ${rows.map(r=>`<tr>${cols.map(c=>c[1](r,m)).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}" class="empty">No log entries yet.</td></tr>`}</tbody></table></div>`;
+}
+function viewProfile(){
+  const names=[...L("sources"),...S.stalkers.map(s=>s.name).sort((a,b)=>a.localeCompare(b))];
+  if(!S.profile){const recent=S.log.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).find(r=>!L("sources").includes(r.character));S.profile=recent?recent.character:(names[L("sources").length]||names[0]||"")}
+  const p=S.stalkers.find(s=>s.name===S.profile)||{name:S.profile};
+  const rows=S.log.filter(r=>r.character===S.profile||r.with===S.profile).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  let rubOut=0,rubIn=0,itIn=0,itOut=0;
+  for(const r of rows){const q=Number(r.qty)||0,rub=isRuble(r.item);
+    if(r.action==="Given out"){rub?rubOut+=q:itOut+=q}else{rub?rubIn+=q:itIn+=q}}
+  const ph=photoUrl(p.photo);
+  return `<div class="panel"><div class="row"><label for="pick" style="color:var(--muted)">Select stalker</label>
+    <select id="pick" style="width:auto;min-width:240px">${opts(names,S.profile)}</select></div></div>
+  <div class="profile">
+   <div class="panel"><h2>Info</h2><dl class="info">${STALKER_FIELDS.filter(f=>f[0]!=="name").map(f=>`<dt>${f[1]}</dt><dd>${f[0]==="status"&&p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:esc(p[f[0]])||'<span style="color:#5f6153">—</span>'}</dd>`).join("")}</dl></div>
+   <div class="panel"><h2>Totals</h2><dl class="info">
+     <dt>Rubles paid to them</dt><dd class="num">${fmtN(rubOut)}</dd><dt>Rubles they paid us</dt><dd>${fmtN(rubIn)}</dd>
+     <dt>Items they brought in</dt><dd>${fmtN(itIn)}</dd><dt>Items given to them</dt><dd>${fmtN(itOut)}</dd><dt>Log entries</dt><dd>${rows.length}</dd></dl></div>
+   <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(p.name)}">`:`<div class="photo">No photo</div>`}</div>
+  </div>
+  <div class="panel"><h2>Trade history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Item",r=>`<td><button class="link" data-item="${esc(r.item)}">${esc(r.item)}</button></td>`],["Category",(r,m)=>`<td style="color:var(--muted)">${esc(categoryOf(r.item,m))}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["With",r=>`<td>${esc(r.character===S.profile?r.with:r.character)}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
+}
+function viewItem(){
+  const names=S.items.map(i=>i.name).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true}));
+  if(!S.itemSel||!names.includes(S.itemSel))S.itemSel=S.itemSel&&names.find(n=>n.toLowerCase()===S.itemSel.toLowerCase())||names[0]||"";
+  const it=S.items.find(i=>i.name===S.itemSel)||{name:S.itemSel},{st,stor}=stockTable(),e=st.get((S.itemSel||"").toLowerCase())||{by:{},rec:0,out:0,total:0,count:0};
+  const rows=S.log.filter(r=>(r.item||"").toLowerCase()===(S.itemSel||"").toLowerCase()).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const ph=photoUrl(it.photo),last=rows[0];
+  return `<div class="panel"><div class="row"><label for="pick-item" style="color:var(--muted)">Select item</label>
+    <select id="pick-item" style="width:auto;min-width:260px">${opts(names,S.itemSel)}</select></div></div>
+  <div class="profile">
+   <div class="panel"><h2>Info</h2><dl class="info"><dt>Category</dt><dd>${esc(it.category)||"—"}</dd><dt>Times logged</dt><dd>${e.count}</dd><dt>Last moved</dt><dd>${last?fmtTs(last.ts):"—"}</dd><dt>Notes</dt><dd>${esc(it.notes)||"—"}</dd></dl></div>
+   <div class="panel"><h2>Stock</h2><dl class="info"><dt><b>In stock (total)</b></dt><dd><b class="${e.total>0?"stock-pos":e.total<0?"stock-neg":"stock-zero"}" style="font-size:20px">${fmtN(e.total)}</b></dd>
+     ${stor.map(s=>`<dt>${esc(s)}</dt><dd>${fmtN(e.by[s]||0)}</dd>`).join("")}<dt>Total received</dt><dd>${fmtN(e.rec)}</dd><dt>Total given out</dt><dd>${fmtN(e.out)}</dd></dl></div>
+   <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(it.name)}">`:`<div class="photo">No photo</div>`}</div>
+  </div>
+  <div class="panel"><h2>Item history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Character",r=>`<td><button class="link" data-prof="${esc(r.character)}">${esc(r.character)}</button></td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Quality",r=>`<td>${esc(r.quality)}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["Storage",r=>`<td>${esc(r.storage)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
+}
+
+/* ---------- Lists ---------- */
+const LIST_LABELS=[["storages","Storages"],["categories","Item categories"],["sources","Non-stalker sources (Character dropdown)"],["qualities","Qualities"],["factions","Factions"],["statuses","Statuses"],["ranks","FOB ranks"],["teams","FOB teams"]];
+function viewLists(){
+  return `<form class="panel" id="lists-form"><h2>Dropdown lists</h2><p style="color:var(--muted);margin:0 0 12px">One option per line. These feed the dropdowns everywhere on the site.</p>
+  <div class="split">${LIST_LABELS.map(([k,l])=>`<div class="field"><label for="l-${k}">${l}</label><textarea id="l-${k}" rows="6" ${S.canWrite?"":"readonly"}>${esc(L(k).join("\n"))}</textarea></div>`).join("")}</div>
+  ${S.canWrite?`<div class="row" style="margin-top:10px"><button class="btn primary" type="submit">Save lists</button></div>`:""}<div class="msg" id="l-msg"></div></form>`;
+}
+
+/* ---------- Accounts (admin only) ---------- */
+const ROLES=[["admin","Admin"],["member","Member (can edit)"],["viewer","Viewer (read only)"]];
+function viewAccounts(){
+  if(!S.isAdmin)return `<div class="panel">Only admins can see this page.</div>`;
+  const rows=S.members.slice().sort((a,b)=>(a.username||"").localeCompare(b.username||""));
+  return `<form class="panel" id="acc-new" autocomplete="off"><h2>Create account</h2>
+   <p style="color:var(--muted);margin:0 0 12px">Pick a username and password, then give them to the FOB member. Usernames: 3–30 letters, numbers, dots, dashes or underscores.</p>
+   <div class="grid">
+    <div class="field"><label for="a-user">Username</label><input id="a-user" required autocomplete="off"></div>
+    <div class="field"><label for="a-pass">Password</label><input id="a-pass" type="text" required minlength="6" autocomplete="new-password"></div>
+    <div class="field"><label for="a-char">Character name (fills "Handled by")</label><input id="a-char" list="dl-fob2"><datalist id="dl-fob2">${S.fob.slice().sort(byName).map(f=>`<option value="${esc(f.name)}">`).join("")}</datalist></div>
+    <div class="field"><label for="a-role">Role</label><select id="a-role">${ROLES.map(([k,l])=>`<option value="${k}" ${k==="member"?"selected":""}>${l}</option>`).join("")}</select></div>
+   </div>
+   <div class="row" style="margin-top:10px"><button class="btn primary" type="submit">Create account</button><button class="btn" type="button" id="a-gen">Random password</button></div>
+   <div class="msg" id="a-msg"></div></form>
+  <div class="panel"><h2>Accounts</h2>
+   <div class="tablewrap"><table><thead><tr><th>Username</th><th>Character</th><th>Role</th><th>Access</th><th>Created</th></tr></thead><tbody>
+   ${rows.map(m=>{const self=S.me&&m.id===S.me.id;return`<tr><td><b>${esc(m.username)}</b>${self?' <span class="badge">you</span>':""}</td>
+    <td>${self?esc(m.character):`<input data-mchar="${m.id}" value="${esc(m.character)}" style="width:200px" list="dl-fob2">`}</td>
+    <td>${self?esc(m.role):`<select data-mrole="${m.id}" style="width:auto">${ROLES.map(([k])=>`<option ${k===m.role?"selected":""}>${k}</option>`).join("")}</select>`}</td>
+    <td>${self?'<span class="chip in">Active</span>':`<button class="btn small ${m.active?"danger":""}" data-mactive="${m.id}">${m.active?"Lock out":"Let back in"}</button> ${m.active?'<span class="chip in">Active</span>':'<span class="chip out">Locked out</span>'}`}</td>
+    <td>${m.created?fmtDay(m.created):""}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No accounts yet.</td></tr>`}
+   </tbody></table></div>
+   <p style="color:var(--muted);font-size:13px;margin:10px 0 0"><b>Forgot password?</b> Lock out the old account and make a new one with a slightly different username (for example <i>stryker2</i>). Anyone can change their own password under <i>Account</i> at the top.</p>
+   <div class="msg" id="acc-msg"></div></div>
+  <form class="panel" id="imp"><h2>Import data</h2>
+   <p style="color:var(--muted);margin:0 0 12px">Load the <i>ecologists-data.json</i> file once to copy over everything from the old site. Running it again only overwrites those same entries; it never deletes anything.</p>
+   <div class="row"><input type="file" id="imp-file" accept=".json,application/json" style="width:auto"><button class="btn primary" type="submit">Import</button></div>
+   <div class="msg" id="imp-msg"></div></form>`;
+}
+async function createAccount(){
+  const u=$("#a-user").value.trim().toLowerCase(),p=$("#a-pass").value,ch=$("#a-char").value.trim(),role=$("#a-role").value;
+  
+  if(!validUser(u)){setMsg("a-msg","err","Username: 3–30 letters, numbers, dots, dashes or underscores, no spaces.");return}
+  if(p.length<6){setMsg("a-msg","err","The password needs at least 6 characters.");return}
+  if(S.members.some(m=>m.username===u)){setMsg("a-msg","err","That username is already taken.");return}
+  const btns=[...document.querySelectorAll("#acc-new button")];btns.forEach(b=>b.disabled=true);setMsg("a-msg","","Creating…");
+  let sec=firebase.apps.find(a=>a.name==="creator")||firebase.initializeApp(FIREBASE_CONFIG,"creator");
+  try{
+    const cred=await sec.auth().createUserWithEmailAndPassword(toEmail(u),p);
+    await db.collection("members").doc(cred.user.uid).set({username:u,character:ch,role,active:true,created:Date.now()});
+    await sec.auth().signOut();
+    btns.forEach(b=>b.disabled=false);
+    $("#a-user").value="";$("#a-pass").value="";$("#a-char").value="";
+    setMsg("a-msg","ok",`Created. Give them — username: ${u} · password: ${p}`);
+  }catch(e){try{await sec.auth().signOut()}catch(_){}btns.forEach(b=>b.disabled=false);setMsg("a-msg","err",errText(e))}
+}
+async function runImport(){
+  const f=$("#imp-file").files[0];
+  if(!f){setMsg("imp-msg","err","Pick the ecologists-data.json file first.");return}
+  let data;try{data=JSON.parse(await f.text())}catch(_){setMsg("imp-msg","err","That file isn't valid JSON.");return}
+  if(!data||data.format!=="ecologists-fob-seed-1"||!Array.isArray(data.docs)){setMsg("imp-msg","err","That isn't the Ecologists data file.");return}
+  const ok=new Set(["log","items","stalkers","fob","config"]),docs=data.docs.filter(d=>d&&typeof d.path==="string"&&ok.has(d.path.split("/")[0])&&d.path.split("/").length===2);
+  const b0=$("#imp button");b0.disabled=true;
+  try{for(let i=0;i<docs.length;i+=200){const b=db.batch();for(const d of docs.slice(i,i+200))b.set(db.doc(d.path),d.data);await b.commit();setMsg("imp-msg","",`Imported ${Math.min(i+200,docs.length)} of ${docs.length}…`)}
+    setMsg("imp-msg","ok",`Done — imported ${docs.length} records.`)}
+  catch(e){setMsg("imp-msg","err",errText(e))}
+  b0.disabled=false;
+}
+function setMsg(id,cls,text){S.flash[id]=[cls,text];const el=$("#"+id);if(el){el.className="msg "+cls;el.textContent=text}}
+function applyFlash(){for(const [id,[c,t]] of Object.entries(S.flash)){const el=$("#"+id);if(el){el.className="msg "+c;el.textContent=t}}}
+function randomPass(){const a="abcdefghjkmnpqrstuvwxyz23456789",r=crypto.getRandomValues(new Uint32Array(10));return [...r].map(x=>a[x%a.length]).join("")}
+
+/* ---------- Account (everyone) ---------- */
+function openAccountModal(){
+  openModal(`<form id="m-form" autocomplete="off"><h2>Your account</h2>
+   <p style="color:var(--muted);margin:0 0 12px">Logged in as <b>${esc(S.me.username)}</b> · role: ${esc(S.me.role)}</p>
+   <div class="grid"><div class="field"><label for="p-cur">Current password</label><input id="p-cur" type="password" autocomplete="current-password" required></div>
+   <div class="field"><label for="p-new">New password</label><input id="p-new" type="password" autocomplete="new-password" minlength="6" required></div></div>
+   <div class="row" style="margin-top:12px"><button class="btn primary" type="submit">Change password</button><button class="btn" type="button" id="m-cancel">Close</button></div>
+   <div class="msg" id="m-msg"></div></form>`);
+  $("#m-cancel").onclick=closeModal;
+  $("#m-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#m-msg"),cur=$("#p-cur").value,nw=$("#p-new").value;
+    if(nw.length<6){msg.className="msg err";msg.textContent="The new password needs at least 6 characters.";return}
+    try{const u=auth.currentUser;await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,cur));await u.updatePassword(nw);
+      msg.className="msg ok";msg.textContent="Password changed.";$("#p-cur").value="";$("#p-new").value=""}
+    catch(e){msg.className="msg err";msg.textContent=e.code==="auth/wrong-password"||e.code==="auth/invalid-credential"?"Your current password is wrong.":errText(e)}};
+}
+
+/* ---------- Modals ---------- */
+function openModal(html){$("#modal").innerHTML=html;$("#overlay").classList.add("open");$("#modal input,#modal select")?.focus()}
+function closeModal(){$("#overlay").classList.remove("open");$("#modal").innerHTML="";render()}
+$("#overlay").addEventListener("click",e=>{if(e.target.id==="overlay")closeModal()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal()});
+function photoField(rec){return S.canWrite?`<div class="field wide"><label for="m-photo">Photo</label><div class="row">${thumb(rec)}<input id="m-photo" type="file" accept="image/*" style="width:auto">${rec&&rec.photo?`<label class="row"><input type="checkbox" id="m-nophoto" style="width:auto"> Remove photo</label>`:""}</div></div>`:""}
+function shrinkImage(file,max){return new Promise((res,rej)=>{const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{const s=Math.min(1,max/Math.max(img.width,img.height)),w=Math.max(1,Math.round(img.width*s)),h=Math.max(1,Math.round(img.height*s));
+    const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h);URL.revokeObjectURL(url);
+    let d=c.toDataURL("image/webp",0.82);if(!d.startsWith("data:image/webp"))d=c.toDataURL("image/jpeg",0.85);res(d)};
+  img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("That file isn't a picture I can read."))};img.src=url})}
+async function handlePhoto(rec,data){
+  const f=$("#m-photo")?.files?.[0];
+  if(f){data.photo=await shrinkImage(f,320)}
+  else if($("#m-nophoto")?.checked)data.photo="";
+  else data.photo=rec?.photo||"";
+}
+function openItemModal(id,prefill){
+  const rec=id?S.items.find(i=>i.id===id):null;
+  const refs=rec?S.log.filter(r=>(r.item||"").toLowerCase()===rec.name.toLowerCase()).length:0;
+  openModal(`<form id="m-form"><h2>${rec?"Edit item":"Add item"}</h2><div class="grid">
+   <div class="field"><label for="m-name">Name</label><input id="m-name" value="${esc(rec?rec.name:(prefill||""))}" required></div>
+   <div class="field"><label for="m-cat">Category</label><select id="m-cat">${opts(L("categories"),rec?rec.category:"Ingredient")}</select></div>
+   <div class="field wide"><label for="m-notes">Notes / description</label><textarea id="m-notes">${esc(rec?.notes)}</textarea></div>${photoField(rec)}</div>
+   ${rec&&refs?`<p style="color:var(--muted);font-size:13px">Renaming also updates the ${refs} log ${refs===1?"entry":"entries"} for this item.</p>`:""}
+   <div class="row" style="margin-top:12px"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="m-cancel">Cancel</button>
+   ${rec&&!refs?`<button class="btn danger" type="button" id="m-del">Delete item</button>`:""}</div><div class="msg" id="m-msg"></div></form>`);
+  $("#m-cancel").onclick=closeModal;
+  $("#m-del")&&($("#m-del").onclick=async()=>{const b=$("#m-del");if(b.dataset.c!=="1"){b.dataset.c="1";b.textContent="Click again to delete";return}
+    try{await db.collection("items").doc(rec.id).delete();closeModal()}catch(e){$("#m-msg").className="msg err";$("#m-msg").textContent=errText(e)}});
+  $("#m-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#m-msg");
+    const name=$("#m-name").value.trim();if(!name){msg.className="msg err";msg.textContent="Give the item a name.";return}
+    const dup=S.items.find(i=>i.name.toLowerCase()===name.toLowerCase()&&(!rec||i.id!==rec.id));
+    if(dup){msg.className="msg err";msg.textContent="An item with that name already exists.";return}
+    const data={name,category:$("#m-cat").value,notes:$("#m-notes").value.trim()};
+    $("#m-form").querySelectorAll("button").forEach(b=>b.disabled=true);msg.className="msg";msg.textContent="Saving…";
+    try{await handlePhoto(rec,data);
+      if(rec){await db.collection("items").doc(rec.id).set(data);
+        if(rec.name!==name){for(const r of S.log.filter(r=>(r.item||"").toLowerCase()===rec.name.toLowerCase())){await db.collection("log").doc(r.id).update({item:name})}}}
+      else await db.collection("items").add(data);
+      closeModal();
+      if(prefill&&$("#e-item")){$("#e-item").value=name;$("#e-msg").className="msg ok";$("#e-msg").textContent=`Added “${name}” to Items. Press Save entry again.`}
+    }catch(e){$("#m-form").querySelectorAll("button").forEach(b=>b.disabled=false);msg.className="msg err";msg.textContent=errText(e)}};
+}
+function openPersonModal(kind,id){
+  const list=kind==="fob"?S.fob:S.stalkers,fields=kind==="fob"?FOB_FIELDS:STALKER_FIELDS,rec=id?list.find(p=>p.id===id):null;
+  openModal(`<form id="m-form"><h2>${rec?"Edit":"Add"} ${kind==="fob"?"FOB member":"stalker"}</h2><div class="grid">
+  ${fields.map(([k,l,lk,wide])=>`<div class="field ${wide?"wide":""}"><label for="m-${k}">${l}</label>${lk?`<select id="m-${k}">${opts(L(lk),rec?.[k]||"","—")}</select>`:wide?`<textarea id="m-${k}">${esc(rec?.[k])}</textarea>`:`<input id="m-${k}" value="${esc(rec?.[k])}" ${k==="name"?"required":""}>`}</div>`).join("")}
+  ${photoField(rec)}</div>
+  <div class="row" style="margin-top:12px"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="m-cancel">Cancel</button>${rec?`<button class="btn danger" type="button" id="m-del">Delete</button>`:""}</div><div class="msg" id="m-msg"></div></form>`);
+  $("#m-cancel").onclick=closeModal;
+  $("#m-del")&&($("#m-del").onclick=async()=>{const b=$("#m-del");if(b.dataset.c!=="1"){b.dataset.c="1";b.textContent="Click again to delete";return}
+    try{await db.collection(kind).doc(rec.id).delete();closeModal()}catch(e){$("#m-msg").className="msg err";$("#m-msg").textContent=errText(e)}});
+  $("#m-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#m-msg"),data={};
+    for(const [k] of fields)data[k]=$("#m-"+k).value.trim();
+    if(!data.name){msg.className="msg err";msg.textContent="A name is required.";return}
+    $("#m-form").querySelectorAll("button").forEach(b=>b.disabled=true);msg.className="msg";msg.textContent="Saving…";
+    try{await handlePhoto(rec,data);if(rec)await db.collection(kind).doc(rec.id).set(data);else await db.collection(kind).add(data);closeModal()}
+    catch(e){$("#m-form").querySelectorAll("button").forEach(b=>b.disabled=false);msg.className="msg err";msg.textContent=errText(e)}};
+}
+
+/* ---------- events ---------- */
+function bindView(v){
+  const q=$("#f-q");if(q){q.oninput=()=>{S.f.q=q.value;const pos=q.selectionStart;render();const n=$("#f-q");n.focus();n.setSelectionRange(pos,pos)}}
+  $("#f-storage")&&($("#f-storage").onchange=e=>{S.f.storage=e.target.value;render()});
+  $("#f-action")&&($("#f-action").onchange=e=>{S.f.action=e.target.value;render()});
+  $("#f-cat")&&($("#f-cat").onchange=e=>{S.f.cat=e.target.value;render()});
+  $("#f-only")&&($("#f-only").onchange=e=>{S.f.onlyStock=e.target.checked;render()});
+  $("#pick")&&($("#pick").onchange=e=>{S.profile=e.target.value;render()});
+  $("#pick-item")&&($("#pick-item").onchange=e=>{S.itemSel=e.target.value;render()});
+  const form=$("#entry");
+  if(form){form.onsubmit=ev=>{ev.preventDefault();saveEntry(false)};
+    $("#e-more")&&($("#e-more").onclick=()=>saveEntry(true));
+    $("#e-cancel")&&($("#e-cancel").onclick=()=>{S.edit=null;render()});
+    const it=$("#e-item");it&&it.addEventListener("change",()=>{const x=itemMap().get(it.value.trim().toLowerCase());if(x)it.value=x.name})}
+  $("#add-item")&&($("#add-item").onclick=()=>openItemModal(null));
+  $("#add-person")&&($("#add-person").onclick=e=>openPersonModal(e.target.dataset.kind,null));
+  $("#acc-new")&&($("#acc-new").onsubmit=ev=>{ev.preventDefault();createAccount()});
+  $("#a-gen")&&($("#a-gen").onclick=()=>{$("#a-pass").value=randomPass()});
+  $("#imp")&&($("#imp").onsubmit=ev=>{ev.preventDefault();runImport()});
+  const lf=$("#lists-form");
+  if(lf)lf.onsubmit=async ev=>{ev.preventDefault();const data={};for(const [k] of LIST_LABELS)data[k]=$("#l-"+k).value.split("\n").map(s=>s.trim()).filter(Boolean);
+    data.actions=L("actions");const m=$("#l-msg");
+    try{await db.doc("config/lists").set(data);m.className="msg ok";m.textContent="Lists saved."}catch(e){m.className="msg err";m.textContent=errText(e)}};
+}
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-prof],[data-item],[data-edit],[data-del],[data-group],[data-edititem],[data-editperson]");if(!t)return;
+  if(t.dataset.prof!==undefined){S.profile=t.dataset.prof;if(location.hash!=="#profile")location.hash="profile";else render();return}
+  if(t.dataset.item!==undefined){S.itemSel=t.dataset.item;if(location.hash!=="#item")location.hash="item";else render();return}
+  if(t.dataset.group){const k=t.dataset.group;S.openGroups.has(k)?S.openGroups.delete(k):S.openGroups.add(k);render();return}
+  if(t.dataset.edititem){openItemModal(t.dataset.edititem);return}
+  if(t.dataset.editperson){openPersonModal(t.dataset.kind,t.dataset.editperson);return}
+  if(t.dataset.edit){S.edit=S.log.find(r=>r.id===t.dataset.edit)||null;render();window.scrollTo({top:0,behavior:"smooth"});return}
+  if(t.dataset.del){if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Sure?";setTimeout(()=>{if(t.isConnected){t.dataset.c="";t.textContent="Delete"}},3500);return}
+    t.disabled=true;try{await db.collection("log").doc(t.dataset.del).delete()}catch(err){t.disabled=false;setStatus(errText(err),true)}}
+});
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("[data-mactive]");if(!t)return;const m=S.members.find(x=>x.id===t.dataset.mactive);if(!m)return;
+  if(m.active&&t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Sure? Click again";return}
+  t.disabled=true;try{await db.collection("members").doc(m.id).update({active:!m.active})}catch(err){t.disabled=false;setMsg("acc-msg","err",errText(err))}
+});
+document.addEventListener("change",async e=>{
+  const t=e.target;const id=t.dataset&&(t.dataset.mrole||t.dataset.mchar);if(!id)return;
+  const upd=t.dataset.mrole?{role:t.value}:{character:t.value.trim()};
+  try{await db.collection("members").doc(id).update(upd);setMsg("acc-msg","ok","Saved.")}catch(err){setMsg("acc-msg","err",errText(err))}
+});
+window.addEventListener("hashchange",()=>{S.flash={};S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
+
+/* ---------- data ---------- */
+let renderQueued=false;
+function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;
+  const a=document.activeElement;
+  if(a&&a.closest&&(a.closest("#modal")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar)))return;
+  if(a&&a.closest&&a.closest("#entry")&&route()==="log"){renderKpis();const {out,m}=logRows();const ls=$("#list-slot");if(ls){ls.innerHTML=logList(out,m);bindView("log-list")}return}
+  render()})}
+function sub(name,query){
+  const timer=setTimeout(()=>{if(!S.ready[name])setStatus("The database is taking a while to answer. The data may be out of date.",true)},10000);
+  unsubs.push(query.onSnapshot(snap=>{S[name]=snap.docs.map(d=>({id:d.id,...d.data()}));if(!snap.metadata.fromCache){S.ready[name]=true;clearTimeout(timer)}
+    if(Object.values(S.ready).every(Boolean))setStatus(S.canWrite?"Live · changes from other FOB members appear automatically.":"Live · view only.");
+    queueRender()},err=>{clearTimeout(timer);S.ready[name]=true;setStatus(err.code==="permission-denied"?"Your account can't read this data. Ask the admin.":"Couldn't load part of the data. Reload the page to try again.",true);queueRender()}));
+}
+function stopData(){unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[]}
+function startData(){
+  stopData();
+  sub("log",db.collection("log").orderBy("ts","desc").limit(2000));
+  sub("items",db.collection("items").limit(1000));
+  sub("stalkers",db.collection("stalkers").limit(1000));
+  sub("fob",db.collection("fob").limit(1000));
+  unsubs.push(db.doc("config/lists").onSnapshot(s=>{if(s.exists){const d=s.data();S.lists={...DEFAULT_LISTS,...d}}queueRender()},()=>{}));
+  if(S.isAdmin)unsubs.push(db.collection("members").onSnapshot(s=>{S.members=s.docs.map(d=>({id:d.id,...d.data()}));queueRender()},()=>{}));
+}
+
+/* ---------- login gate ---------- */
+function showGate(html){$("#app").classList.add("hidden");$("#gate").classList.remove("hidden");$("#gate-card").innerHTML=html}
+function showApp(){$("#gate").classList.add("hidden");$("#app").classList.remove("hidden")}
+const GATE_HEAD=`<h1>Ecologists Field Database<small>Russo-Belarussian Ecologist Mission · FOB access only</small></h1>`;
+function loginForm(note){
+  showGate(`${GATE_HEAD}<p style="margin-top:12px">${note?esc(note):"Log in with the username and password the admin gave you."}</p>
+  <form id="g-form"><div class="field"><label for="g-user">Username</label><input id="g-user" autocomplete="username" autocapitalize="none" required></div>
+  <div class="field"><label for="g-pass">Password</label><input id="g-pass" type="password" autocomplete="current-password" required></div>
+  <button class="btn primary" type="submit" style="width:100%">Log in</button><div class="msg" id="g-msg"></div></form>`);
+  $("#g-user").focus();
+  if(gateNote){$("#g-msg").className="msg err";$("#g-msg").textContent=gateNote;gateNote=""}
+  $("#g-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#g-msg"),u=$("#g-user").value;
+    if(!validUser(u)){msg.className="msg err";msg.textContent="Wrong username or password.";return}
+    msg.className="msg";msg.textContent="Logging in…";
+    try{await auth.signInWithEmailAndPassword(toEmail(u),$("#g-pass").value)}catch(e){msg.className="msg err";msg.textContent=errText(e)}};
+}
+function setupForm(){
+  showGate(`${GATE_HEAD}<p style="margin-top:12px"><b>First-time setup.</b> Create the admin account. This only shows once — after this, nobody else can become admin by themselves.</p>
+  <form id="g-form"><div class="field"><label for="g-user">Admin username</label><input id="g-user" autocomplete="username" autocapitalize="none" required></div>
+  <div class="field"><label for="g-pass">Password (at least 6 characters)</label><input id="g-pass" type="password" autocomplete="new-password" minlength="6" required></div>
+  <div class="field"><label for="g-char">Your character name (optional)</label><input id="g-char"></div>
+  <button class="btn primary" type="submit" style="width:100%">Create admin account</button><div class="msg" id="g-msg"></div></form>`);
+  if(gateNote){$("#g-msg").className="msg err";$("#g-msg").textContent=gateNote;gateNote=""}
+  $("#g-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#g-msg"),u=$("#g-user").value.trim().toLowerCase(),p=$("#g-pass").value;
+    if(!validUser(u)){msg.className="msg err";msg.textContent="Username: 3–30 letters, numbers, dots, dashes or underscores, no spaces.";return}
+    if(p.length<6){msg.className="msg err";msg.textContent="The password needs at least 6 characters.";return}
+    msg.className="msg";msg.textContent="Creating…";settingUp=true;
+    try{const cred=await auth.createUserWithEmailAndPassword(toEmail(u),p);
+      const b=db.batch();b.set(db.doc("members/"+cred.user.uid),{username:u,character:$("#g-char").value.trim(),role:"admin",active:true,created:Date.now()});
+      b.set(db.doc("setup/state"),{done:true,admin:cred.user.uid,at:Date.now()});await b.commit();settingUp=false;onUser(cred.user)}
+    catch(e){settingUp=false;gateNote=e.code==="permission-denied"?"Setup was already done. Log in instead.":errText(e);
+      if(auth.currentUser){try{await auth.currentUser.delete()}catch(_){await auth.signOut()}}else{msg.className="msg err";msg.textContent=gateNote;gateNote=""}}};
+}
+let settingUp=false,meUnsub=null,gateNote="";
+function renderWho(){$("#whoami").innerHTML=`<span>${esc(S.me.username)} · ${esc(S.me.role)}</span><button class="btn small" id="w-acc">Account</button><button class="btn small" id="w-out">Log out</button>`;
+  $("#w-acc").onclick=openAccountModal;$("#w-out").onclick=()=>auth.signOut()}
+function onUser(user){
+  if(meUnsub){meUnsub();meUnsub=null}
+  if(!user){stopData();S.me=null;S.isAdmin=S.canWrite=false;
+    db.doc("setup/state").get().then(s=>s.exists?loginForm():setupForm()).catch(()=>loginForm());return}
+  if(settingUp)return;
+  showGate(`${GATE_HEAD}<p style="margin-top:12px">Checking your access…</p>`);
+  meUnsub=db.doc("members/"+user.uid).onSnapshot(s=>{
+    const m=s.exists?{id:s.id,...s.data()}:null;
+    if(!m||!m.active){stopData();S.me=null;
+      showGate(`${GATE_HEAD}<p style="margin-top:12px">${m?"Your account has been locked out. Ask the admin if this is a mistake.":"This account has no access. Ask the admin."}</p><button class="btn" id="g-out">Log out</button>`);
+      $("#g-out").onclick=()=>auth.signOut();return}
+    const wasAdmin=S.isAdmin,first=!S.me;
+    S.me=m;S.isAdmin=m.role==="admin";S.canWrite=S.isAdmin||m.role==="member";S.canEdit=S.canWrite;
+    showApp();renderWho();
+    if(first||wasAdmin!==S.isAdmin)startData();
+    render();
+  },err=>loginForm("Couldn't check your access. Try logging in again."));
+}
+function init(){
+  if(typeof firebase==="undefined"){showGate(`${GATE_HEAD}<p style="margin-top:12px;color:var(--bad)">Couldn't load the login system. Check your internet connection and reload.</p>`);return}
+  if(typeof FIREBASE_CONFIG==="undefined"||!FIREBASE_CONFIG.apiKey||String(FIREBASE_CONFIG.apiKey).includes("PASTE")){showGate(`${GATE_HEAD}<p style="margin-top:12px;color:var(--bad)">Not set up yet: paste your Firebase settings into <b>config.js</b>.</p>`);return}
+  firebase.initializeApp(FIREBASE_CONFIG);auth=firebase.auth();db=firebase.firestore();
+  auth.onAuthStateChanged(onUser);
+}
+init();
+</script>
+</body>
+</html>
