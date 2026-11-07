@@ -234,8 +234,8 @@ function isRuble(n){return (n||"").toLowerCase()==="ruble"}
 
 /* ---------- render shell ---------- */
 function pendingCount(){return S.isAdmin?S.members.filter(m=>m.role==="pending").length:0}
-function tabs(){return S.isAdmin?[...TABS,["accounts","Accounts"]]:TABS}
-function route(){const h=(location.hash||"").replace("#","");return tabs().some(t=>t[0]===h)?h:"log"}
+function tabs(){if(S.viewer)return [["item","Item Profile"]];return S.isAdmin?[...TABS,["accounts","Accounts"]]:TABS}
+function route(){const h=(location.hash||"").replace("#","");return tabs().some(t=>t[0]===h)?h:(S.viewer?"item":"log")}
 function renderTabs(){const cur=route(),n=chatUnread();
   $("#tabs").innerHTML=tabs().map(([k,l])=>`<a href="#${k}" ${k===cur?'aria-current="page"':""}>${l}${k==="accounts"&&pendingCount()?`<span class="tabdot" title="${pendingCount()} new account request${pendingCount()===1?"":"s"}"></span>`:""}${k==="chat"&&n?`<span class="tabdot" title="${n} new message${n===1?"":"s"}"></span><span class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"> (${n} new)</span>`:""}</a>`).join("");
   document.title=(n?`(${n>99?"99+":n}) `:"")+"Ecologists Field Database"}
@@ -546,7 +546,7 @@ function viewItem(){
      ${stor.map(s=>`<dt>${esc(s)}</dt><dd>${fmtN(e.by[s]||0)}</dd>`).join("")}<dt>Total received</dt><dd>${fmtN(e.rec)}</dd><dt>Total given out</dt><dd>${fmtN(e.out)}</dd></dl></div>
    <div class="panel"><h2>Photo</h2>${ph?`<img class="photo" src="${esc(ph)}" alt="Photo of ${esc(it.name)}">`:`<div class="photo">No photo</div>`}</div>
   </div>
-  <div class="panel"><h2>Item history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Character",r=>`<td><button class="link" data-prof="${esc(r.character)}">${esc(r.character)}</button></td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Quality",r=>`<td>${esc(r.quality)}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["Storage",r=>`<td>${esc(r.storage)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
+  <div class="panel"><h2>Item history</h2>${historyTable(rows,[["Date",r=>`<td>${fmtTs(r.ts)}</td>`],["Character",r=>`<td>${S.viewer?esc(people(r).join(", ")):people(r).map(n=>`<button class="link" data-prof="${esc(n)}">${esc(n)}</button>`).join(", ")}</td>`],["Action",r=>`<td><span class="chip ${r.action==="Received"?"in":"out"}">${esc(r.action)}</span></td>`],["Quality",r=>`<td>${esc(r.quality)}</td>`],["Qty",r=>`<td class="num">${fmtN(r.qty)}</td>`,1],["Storage",r=>`<td>${esc(r.storage)}</td>`],["Handled by",r=>`<td>${esc(r.handledBy)}</td>`],["Notes",r=>`<td class="notes">${esc(r.notes)}</td>`]])}</div>`;
 }
 
 /* ---------- Lists ---------- */
@@ -932,9 +932,10 @@ function startData(){
   stopData();
   sub("log",db.collection("log").orderBy("ts","desc").limit(2000));
   sub("items",db.collection("items").limit(1000));
+  unsubs.push(db.doc("config/lists").onSnapshot(s=>{if(s.exists){const d=s.data();S.lists={...DEFAULT_LISTS,...d}}queueRender()},()=>{}));
+  if(S.viewer){S.ready.stalkers=S.ready.fob=true;S.chatReady=true;return}
   sub("stalkers",db.collection("stalkers").limit(1000));
   sub("fob",db.collection("fob").limit(1000));
-  unsubs.push(db.doc("config/lists").onSnapshot(s=>{if(s.exists){const d=s.data();S.lists={...DEFAULT_LISTS,...d}}queueRender()},()=>{}));
   unsubs.push(db.collection("chat").orderBy("ts","desc").limit(200).onSnapshot(s=>{S.chat=s.docs.map(d=>({id:d.id,...d.data()})).reverse();S.chatReady=true;S.chatErr="";
     if(route()==="chat"&&$("#chat-list")){renderTabs();refreshChat()}else queueRender()},
     err=>{S.chatReady=true;S.chatErr=err.code==="permission-denied"?"Chat isn't switched on yet — the admin needs to update the database rules in Firebase.":"Couldn't load the chat. Reload the page to try again.";queueRender()}));
@@ -1007,7 +1008,7 @@ function renderWho(){$("#whoami").innerHTML=`<span>${esc(S.me.username)} · ${es
   $("#w-acc").onclick=openAccountModal;$("#w-out").onclick=()=>auth.signOut()}
 function onUser(user){
   if(meUnsub){meUnsub();meUnsub=null}
-  if(!user){stopData();S.me=null;S.isAdmin=S.canWrite=false;
+  if(!user){stopData();S.me=null;S.isAdmin=S.canWrite=S.viewer=false;
     db.doc("setup/state").get().then(s=>s.exists?loginForm():setupForm()).catch(()=>loginForm());return}
   if(settingUp||registering)return;
   showGate(`${GATE_HEAD}<p style="margin-top:12px">Checking your access…</p>`);
@@ -1020,10 +1021,10 @@ function onUser(user){
       showGate(`${GATE_HEAD}<p style="margin-top:12px">${m?"Your account has been locked out. Ask the admin if this is a mistake.":"This account has no access. Ask the admin."}</p><button class="btn" id="g-out">Log out</button>`);
       $("#g-out").onclick=()=>auth.signOut();return}
     if(S.me&&S.me.id===m.id&&S.me.role===m.role&&S.me.character===m.character&&S.me.username===m.username)return;
-    const wasAdmin=S.isAdmin,first=!S.me;
-    S.me=m;S.isAdmin=m.role==="admin";S.canWrite=S.isAdmin||m.role==="member";S.canEdit=S.canWrite;
+    const wasAdmin=S.isAdmin,wasViewer=!!S.viewer,first=!S.me;
+    S.me=m;S.viewer=m.role==="viewer";S.isAdmin=m.role==="admin";S.canWrite=S.isAdmin||m.role==="member";S.canEdit=S.canWrite;
     showApp();renderWho();
-    if(first||wasAdmin!==S.isAdmin)startData();
+    if(first||wasAdmin!==S.isAdmin||wasViewer!==(m.role==="viewer"))startData();
     render();
   },err=>loginForm("Couldn't check your access. Try logging in again."));
 }

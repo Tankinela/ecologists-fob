@@ -37,16 +37,17 @@ service cloud.firestore {
       allow delete: if isAdmin() && uid != request.auth.uid;
     }
 
+    // Viewers only get what the Item Profile page needs: items, the storage log and the lists.
     match /log/{id}      { allow read: if isMember(); allow write: if canWrite(); }
     match /items/{id}    { allow read: if isMember(); allow write: if canWrite(); }
-    match /stalkers/{id} { allow read: if isMember(); allow write: if canWrite(); }
-    match /fob/{id}      { allow read: if isMember(); allow write: if canWrite(); }
     match /config/{id}   { allow read: if isMember(); allow write: if canWrite(); }
+    match /stalkers/{id} { allow read, write: if canWrite(); }
+    match /fob/{id}      { allow read, write: if canWrite(); }
 
-    // FOB chat: every active account can read; members and admins can post (viewers are read-only).
+    // FOB chat: members and admins only (viewers can't see it).
     // You can delete your own messages, admins can delete any.
     match /chat/{id} {
-      allow read: if isMember();
+      allow read: if canWrite();
       allow create: if canWrite()
         && request.resource.data.keys().hasOnly(['text', 'uid', 'username', 'character', 'ts', 'replyTo'])
         && (!('replyTo' in request.resource.data) || request.resource.data.replyTo is map)
@@ -65,7 +66,7 @@ service cloud.firestore {
 
     // Member directory for @mentions: usernames + character names only, no roles or access info.
     match /directory/{uid} {
-      allow read: if isMember();
+      allow read: if canWrite();
       allow delete: if isAdmin();
       allow create, update: if request.resource.data.keys().hasOnly(['username', 'character'])
         && request.resource.data.username is string && request.resource.data.character is string
