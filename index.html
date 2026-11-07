@@ -1077,14 +1077,14 @@ const Rain=(()=>{
     const r=(document.querySelector("#app:not(.hidden)")?document.querySelector("#app"):document.querySelector("#gate .card")||document.body).getBoundingClientRect();
     const L=Math.max(0,r.left-10),R=Math.min(W,r.right+10);cols=[];
     for(let x=4;x+CW<=L;x+=CW)cols.push(mk(x));for(let x=Math.ceil((R+4)/CW)*CW;x+CW<=W;x+=CW)cols.push(mk(x))}
-  function mk(x){return {x,y:-Math.random()*H,sp:0.35+Math.random()*0.9,prev:null}}
-  function frame(t){raf=requestAnimationFrame(frame);if(t-last<45)return;last=t;
-    ctx.fillStyle=`rgba(${BG},0.16)`;ctx.fillRect(0,0,W,H);ctx.font=`600 ${FS}px ui-monospace,Consolas,monospace`;ctx.textBaseline="top";
+  function mk(x){return {x,y:-Math.random()*H,sp:0.22+Math.random()*0.45,prev:null}}
+  function frame(t){raf=requestAnimationFrame(frame);if(t-last<85)return;last=t;
+    ctx.fillStyle=`rgba(${BG},0.11)`;ctx.fillRect(0,0,W,H);ctx.font=`600 ${FS}px ui-monospace,Consolas,monospace`;ctx.textBaseline="top";
     for(const c of cols){
       if(c.prev!=null&&c.y>0){ctx.shadowBlur=0;ctx.fillStyle="rgba(64,220,110,.85)";ctx.fillText(c.prev,c.x,c.y-FS)}
       const ch=String((Math.random()*10)|0);c.prev=ch;
       ctx.shadowColor="#5dff8f";ctx.shadowBlur=10;ctx.fillStyle="#d6ffe2";ctx.fillText(ch,c.x,c.y);
-      c.y+=FS*c.sp;if(c.y>H+FS*2&&Math.random()>0.96){c.y=-FS*(2+Math.random()*20);c.sp=0.35+Math.random()*0.9;c.prev=null}}
+      c.y+=FS*c.sp;if(c.y>H+FS*2&&Math.random()>0.96){c.y=-FS*(2+Math.random()*20);c.sp=0.22+Math.random()*0.45;c.prev=null}}
     ctx.shadowBlur=0}
   function start(){if(running||!on()||reduced()||document.hidden)return;layout();if(!cols.length)return;running=true;last=0;raf=requestAnimationFrame(frame)}
   function stop(clear){cancelAnimationFrame(raf);running=false;if(clear){ctx.clearRect(0,0,W,H)}}
