@@ -734,16 +734,16 @@ let renderQueued=false;
 function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;
   const a=document.activeElement;
   if(route()==="chat"&&$("#chat-list")){renderTabs();renderKpis();refreshChat();return}
-  if(a&&a.closest&&(a.closest("#modal")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar)))return;
+  if(a&&a.closest&&(a.closest("#modal")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar))){renderKpis();return}
   if(a&&a.closest&&a.closest("#entry")&&route()==="log"){renderKpis();const {out,m}=logRows();const ls=$("#list-slot");if(ls){ls.innerHTML=logList(out,m);bindView("log-list")}return}
   render()})}
 function sub(name,query){
-  const timer=setTimeout(()=>{if(!S.ready[name])setStatus("The database is taking a while to answer. The data may be out of date.",true)},10000);
-  unsubs.push(query.onSnapshot(snap=>{S[name]=snap.docs.map(d=>({id:d.id,...d.data()}));if(!snap.metadata.fromCache){S.ready[name]=true;clearTimeout(timer)}
+  const timer=setTimeout(()=>{if(!S.ready[name])setStatus("Can't reach the database right now. Showing the last data loaded. Check your internet.",true)},10000);
+  unsubs.push(query.onSnapshot({includeMetadataChanges:true},snap=>{S[name]=snap.docs.map(d=>({id:d.id,...d.data()}));if(!snap.metadata.fromCache){S.ready[name]=true;clearTimeout(timer)}
     if(Object.values(S.ready).every(Boolean))setStatus(S.canWrite?"Live · changes from other FOB members appear automatically.":"Live · view only.");
     queueRender()},err=>{clearTimeout(timer);S.ready[name]=true;setStatus(err.code==="permission-denied"?"Your account can't read this data. Ask the admin.":"Couldn't load part of the data. Reload the page to try again.",true);queueRender()}));
 }
-function stopData(){unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[];S.chat=[];S.chatReady=false;S.chatErr="";S._seenInit=false}
+function stopData(){unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[];S.chat=[];S.chatReady=false;S.chatErr="";S._seenInit=false;S.formState=null;S.edit=null;S.flash={};S.chatDivider=null}
 function startData(){
   stopData();
   sub("log",db.collection("log").orderBy("ts","desc").limit(2000));
