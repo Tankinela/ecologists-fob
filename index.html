@@ -96,6 +96,16 @@ dl.info dd{margin:0}
 .gate .field{margin-bottom:10px}
 .whoami{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:13px;color:var(--muted);justify-content:flex-end;width:100%}
 .hidden{display:none!important}
+.picker{position:relative;display:inline-block;width:280px;max-width:100%}
+.picker input{padding-right:30px;cursor:pointer}
+.picker input:focus{cursor:text}
+.picker .caret{position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--muted);cursor:pointer;font-size:13px}
+.picklist{position:absolute;left:0;right:0;top:calc(100% + 2px);z-index:30;max-height:460px;overflow-y:auto;background:var(--panel-2);border:1px solid #4a5638;border-radius:4px;box-shadow:0 10px 28px rgba(0,0,0,.55);padding:2px 0}
+.picklist .opt{padding:4px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.picklist .opt.hi{background:#9cc3f5;color:#10140b}
+.picklist .opt.cur:not(.hi){color:var(--accent)}
+.picklist .none{padding:6px 12px;color:var(--muted)}
+
 nav.tabs a{position:relative}
 .tabdot{position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;background:#e5484d;box-shadow:0 0 0 2px var(--bg)}
 .chatlist{position:relative}
@@ -389,18 +399,32 @@ const viewStalkers=()=>viewPeople("stalkers"),viewFob=()=>viewPeople("fob");
 
 /* ---------- Profiles ---------- */
 function pickerHtml(id,names,cur,ph){
-  return `<input id="${id}" type="search" list="${id}-dl" value="${esc(cur)}" placeholder="${esc(ph)}" style="width:auto;min-width:280px" autocomplete="off" aria-label="${esc(ph)}">
-  <datalist id="${id}-dl">${names.map(n=>`<option value="${esc(n)}">`).join("")}</datalist><span class="msg" id="${id}-msg" style="margin:0"></span>`}
+  return `<div class="picker" id="${id}-wrap" data-names="${esc(JSON.stringify(names))}">
+   <input id="${id}" value="${esc(cur)}" placeholder="${esc(ph)}" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="${id}-list" aria-label="${esc(ph)}">
+   <span class="caret" aria-hidden="true">▾</span>
+   <div class="picklist" id="${id}-list" role="listbox" hidden></div></div>`}
 function bindPicker(id,set){
-  const el=$("#"+id);if(!el)return;const names=[...$("#"+id+"-dl").options].map(o=>o.value);
-  const go=v=>{set(v);render()};
-  const exact=q=>names.find(n=>n.toLowerCase()===q.trim().toLowerCase());
-  el.addEventListener("focus",()=>el.select());
-  el.addEventListener("input",()=>{const n=exact(el.value);if(n&&n!==el.defaultValue&&el.value===n)go(n)});
-  el.addEventListener("keydown",ev=>{if(ev.key!=="Enter")return;ev.preventDefault();const q=el.value.trim().toLowerCase();if(!q)return;
-    const n=exact(q)||names.find(n=>n.toLowerCase().startsWith(q))||names.find(n=>n.toLowerCase().includes(q));
-    if(n)go(n);else{const m=$("#"+id+"-msg");m.className="msg err";m.textContent="No match."}});
-  el.addEventListener("change",()=>{const n=exact(el.value);if(n&&n!==el.defaultValue)go(n)});
+  const wrap=$("#"+id+"-wrap");if(!wrap)return;
+  const el=$("#"+id),list=$("#"+id+"-list"),names=JSON.parse(wrap.dataset.names),cur=el.value;let shown=[],hi=0;
+  const filter=q=>{q=q.trim().toLowerCase();if(!q)return names;const a=names.filter(n=>n.toLowerCase().startsWith(q)),b=names.filter(n=>!n.toLowerCase().startsWith(q)&&n.toLowerCase().includes(q));return a.concat(b)};
+  const draw=()=>{list.innerHTML=shown.length?shown.map((n,i)=>`<div class="opt${i===hi?" hi":""}${n===cur?" cur":""}" role="option" data-i="${i}">${esc(n)}</div>`).join(""):`<div class="none">No match</div>`;
+    const h=list.querySelector(".hi");if(h){const t=h.offsetTop,b=t+h.offsetHeight;if(t<list.scrollTop)list.scrollTop=t;else if(b>list.scrollTop+list.clientHeight)list.scrollTop=b-list.clientHeight}};
+  const open=(q)=>{shown=filter(q);hi=Math.max(0,q?0:shown.indexOf(cur));list.hidden=false;el.setAttribute("aria-expanded","true");draw();
+    if(!q){const h=list.querySelector(".hi");if(h)list.scrollTop=Math.max(0,h.offsetTop-list.clientHeight/2)}};
+  const close=()=>{list.hidden=true;el.setAttribute("aria-expanded","false")};
+  const pick=n=>{close();if(n&&n!==cur){set(n);render()}else el.value=cur};
+  el.addEventListener("focus",()=>{el.select();open("")});
+  el.addEventListener("click",()=>{if(list.hidden)open("")});
+  wrap.querySelector(".caret").addEventListener("mousedown",ev=>{ev.preventDefault();if(list.hidden){el.focus()}else{close();el.blur()}});
+  el.addEventListener("input",()=>open(el.value));
+  el.addEventListener("keydown",ev=>{
+    if(ev.key==="ArrowDown"){ev.preventDefault();if(list.hidden)open("");else{hi=Math.min(shown.length-1,hi+1);draw()}}
+    else if(ev.key==="ArrowUp"){ev.preventDefault();hi=Math.max(0,hi-1);draw()}
+    else if(ev.key==="Enter"){ev.preventDefault();if(shown[hi])pick(shown[hi])}
+    else if(ev.key==="Escape"){ev.stopPropagation();close();el.value=cur;el.blur()}});
+  list.addEventListener("mousedown",ev=>{ev.preventDefault();const o=ev.target.closest(".opt");if(o)pick(shown[+o.dataset.i])});
+  list.addEventListener("mousemove",ev=>{const o=ev.target.closest(".opt");if(o&&+o.dataset.i!==hi){hi=+o.dataset.i;list.querySelectorAll(".opt").forEach(x=>x.classList.toggle("hi",+x.dataset.i===hi))}});
+  el.addEventListener("blur",()=>setTimeout(()=>{if(document.activeElement!==el){close();el.value=cur}},120));
 }
 function historyTable(rows,cols){
   const m=itemMap();
