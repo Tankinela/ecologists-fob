@@ -127,16 +127,39 @@ nav.tabs a{position:relative}
 .unread{display:inline-block;min-width:18px;padding:1px 6px;border-radius:999px;background:var(--bad);color:#fff;font:600 12px/1.3 var(--body);letter-spacing:0;vertical-align:2px}
 .chatbox{display:flex;flex-direction:column;height:min(70vh,640px)}
 .chatlist{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;padding:4px 2px 8px}
-.cmsg{padding:6px 10px;border-radius:6px}
+.cmsg{padding:6px 10px;border-radius:6px;position:relative}
 .cmsg:hover{background:var(--panel-2)}
 .cmsg .who{font-weight:600;color:var(--accent)}
 .cmsg.mine .who{color:var(--info)}
 .cmsg .when{font-size:12px;color:var(--muted);margin-left:8px}
 .cmsg .txt{white-space:pre-wrap;overflow-wrap:anywhere}
-.cmsg .del{float:right;visibility:hidden}
-.cmsg:hover .del,.cmsg .del:focus{visibility:visible}
+.cmsg .tools{position:absolute;right:8px;top:-12px;display:none;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:2px;box-shadow:0 4px 12px rgba(0,0,0,.4);z-index:5}
+.cmsg:hover .tools,.cmsg .tools:focus-within{display:flex}
+.cmsg .tools button{background:none;border:0;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:14px;color:var(--text)}
+.cmsg .tools button:hover{background:var(--panel-2)}
+.cmsg .tools .danger{color:var(--bad)}
+.rq{font-size:13px;color:var(--muted);margin:0 0 2px 14px;position:relative;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.rq::before{content:"";position:absolute;left:-12px;top:8px;width:10px;height:9px;border-left:2px solid #4a5638;border-top:2px solid #4a5638;border-top-left-radius:5px}
+.rq b{color:var(--text);font-weight:600;margin-right:4px}
+.rq:hover{color:var(--text)}
+.cmsg.flash{animation:flash 1.6s}
+@keyframes flash{0%,30%{background:rgba(156,195,245,.25)}100%{background:transparent}}
+.reacts{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.react{display:inline-flex;align-items:center;gap:5px;background:var(--panel-2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;font-size:13px;cursor:pointer;color:var(--text)}
+.react:hover{border-color:#6b7a50}
+.react.on{background:rgba(156,195,245,.15);border-color:#9cc3f5}
+.react b{font-weight:600;font-size:12px}
+.replybar{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);background:var(--panel-2);border:1px solid var(--line);border-bottom:0;border-radius:6px 6px 0 0;padding:5px 10px;margin-bottom:-1px}
+.replybar b{color:var(--text)}
+.replybar button{margin-left:auto}
+.chatrow{display:flex;gap:8px;align-items:stretch}
+.emojipop{position:fixed;z-index:60;background:var(--panel);border:1px solid #4a5638;border-radius:8px;box-shadow:0 12px 32px rgba(0,0,0,.6);padding:8px;width:292px}
+.emojipop .eg{display:grid;grid-template-columns:repeat(8,1fr);gap:2px}
+.emojipop button{background:none;border:0;border-radius:5px;font-size:20px;line-height:1;padding:5px 0;cursor:pointer}
+.emojipop button:hover,.emojipop button:focus-visible{background:var(--panel-2)}
+.emojipop .eh{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 2px 6px}
 .cday{text-align:center;font-size:12px;color:var(--muted);margin:10px 0 4px}
-.chatform{display:flex;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.chatform{display:flex;flex-direction:column;border-top:1px solid var(--line);padding-top:10px}
 .chatform textarea{min-height:42px;height:42px;resize:none}
 .irows{display:flex;flex-direction:column;gap:6px;margin-top:12px}
 .irow{display:grid;grid-template-columns:140px minmax(180px,1fr) 130px 100px 38px;gap:8px;align-items:end}
@@ -169,7 +192,7 @@ nav.tabs a{position:relative}
 const TABS=[["chat","FOB Chat"],["log","Storage Log"],["stock","In Storage"],["items","Items"],["stalkers","Stalkers"],["fob","FOB Team"],["profile","Character Profile"],["item","Item Profile"],["lists","Lists"]];
 const DEFAULT_LISTS={actions:["Received","Given out"],categories:["Money","Ingredient","Crafted","Mutant Part","Artifact","Weapon","Ammo","Armor","Medical","Tool","Food","Misc"],storages:["Green Crate","Ecologists Trader"],factions:["Loner","Ecologist","Duty","Freedom","UN Military","Bandit","Mercenary","Monolith"],statuses:["Alive","MIA","KIA","Retired"],ranks:["Lead","Sr.","Sr. Sgt.","Sr. Pvt.","Cst.","Pvt."],teams:["Researcher","Doctor","Professor","Military"],qualities:["Normal","High","Pristine"],sources:["Supply","Chest check","Crafting"]};
 const S={log:[],items:[],stalkers:[],fob:[],lists:DEFAULT_LISTS,ready:{log:false,items:false,stalkers:false,fob:false},
-  canWrite:false,canEdit:false,isAdmin:false,flash:{},chat:[],dir:[],chatDivider:null,chatErr:"",chatReady:false,me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
+  canWrite:false,canEdit:false,isAdmin:false,flash:{},chat:[],dir:[],replyTo:null,chatDivider:null,chatErr:"",chatReady:false,me:null,members:[],openGroups:new Set(),f:{q:"",storage:"",action:"",cat:"",onlyStock:true},profile:"",itemSel:"",edit:null,draft:null};
 let db=null,auth=null,assets=null,unsubs=[];
 const DOMAIN="fob.local";
 const toEmail=u=>u.trim().toLowerCase()+"@"+DOMAIN;
@@ -498,6 +521,33 @@ function mentionsMe(text){if(!S.me)return false;const me=S.me.username.toLowerCa
 function renderMentions(text){const known=dirNames(),me=S.me?S.me.username.toLowerCase():"";
   return esc(text).replace(/(^|[^a-z0-9._-])@([a-z0-9._-]{3,30})/gi,(all,pre,u)=>{const l=u.toLowerCase();
     if(l!=="everyone"&&!known.has(l))return all;return `${pre}<span class="mention${l===me||l==="everyone"?" me":""}">@${u}</span>`})}
+const EMOJIS=["👍","👎","❤️","😂","😮","😢","😡","🔥","👀","✅","❌","💯","🎉","🙏","👏","💀","🤝","😎","🤔","😅","🫡","☢️","☣️","⚠️","💰","🔫","🩸","🍖","🧪","🔧","📦","🌲"];
+const ekey=e=>"e"+[...e].map(c=>c.codePointAt(0).toString(16)).join("_");
+const edecode=k=>String.fromCodePoint(...k.slice(1).split("_").map(h=>parseInt(h,16)));
+function whoName(uid){const d=S.dir.find(x=>x.id===uid);if(d)return d.character||d.username;const m=S.chat.find(x=>x.uid===uid);return m?(m.character||m.username):"someone"}
+function reactsHtml(m){const r=m.reactions||{};const ks=Object.keys(r).filter(k=>Array.isArray(r[k])&&r[k].length);if(!ks.length)return "";
+  return `<div class="reacts">${ks.map(k=>{const on=S.me&&r[k].includes(S.me.id);const names=r[k].map(whoName).join(", ");
+    return `<button type="button" class="react${on?" on":""}" data-togglereact="${m.id}" data-ek="${k}" title="${esc(names)}" aria-label="${esc(edecode(k))} ${r[k].length}, ${on?"remove your reaction":"react"}">${edecode(k)}<b>${r[k].length}</b></button>`}).join("")}</div>`}
+async function toggleReact(id,emoji){const m=S.chat.find(x=>x.id===id);if(!m||!S.me)return;const k=ekey(emoji),cur=(m.reactions||{})[k]||[],FV=firebase.firestore.FieldValue;
+  try{await db.collection("chat").doc(id).update({["reactions."+k]:cur.includes(S.me.id)?FV.arrayRemove(S.me.id):FV.arrayUnion(S.me.id)})}
+  catch(e){setMsg("chat-msg","err",e.code==="permission-denied"?"Reactions aren't switched on yet — the admin needs to update the database rules.":errText(e))}}
+function closeEmoji(){const p=$("#emoji-pop");if(p)p.remove()}
+function openEmoji(anchor,onPick,title){closeEmoji();
+  document.body.insertAdjacentHTML("beforeend",`<div class="emojipop" id="emoji-pop" role="dialog" aria-label="${esc(title)}"><div class="eh">${esc(title)}</div><div class="eg">${EMOJIS.map(e=>`<button type="button" data-emo="${e}">${e}</button>`).join("")}</div></div>`);
+  const p=$("#emoji-pop"),r=anchor.getBoundingClientRect(),w=p.offsetWidth,h=p.offsetHeight;
+  let x=Math.min(window.innerWidth-w-8,Math.max(8,r.right-w)),y=r.top-h-6;if(y<8)y=r.bottom+6;p.style.left=x+"px";p.style.top=y+"px";
+  p.addEventListener("mousedown",ev=>ev.preventDefault());
+  p.addEventListener("click",ev=>{const b=ev.target.closest("[data-emo]");if(b){closeEmoji();onPick(b.dataset.emo)}});
+  p.querySelector("button").focus({preventScroll:true})}
+document.addEventListener("mousedown",ev=>{if($("#emoji-pop")&&!ev.target.closest("#emoji-pop")&&!ev.target.closest("[data-reactmsg],#chat-emoji"))closeEmoji()});
+document.addEventListener("keydown",ev=>{if(ev.key==="Escape"&&$("#emoji-pop")){ev.stopPropagation();closeEmoji()}},true);
+window.addEventListener("scroll",closeEmoji,true);
+function replyBarHtml(){const r=S.replyTo;return r?`<div class="replybar" id="replybar">Replying to <b>${esc(r.character||r.username)}</b><button type="button" class="btn small" id="reply-cancel" aria-label="Cancel reply">✕</button></div>`:""}
+function drawReplyBar(){const old=$("#replybar");if(old)old.remove();const f=$("#chat-form");if(f&&S.replyTo){f.insertAdjacentHTML("afterbegin",replyBarHtml());$("#reply-cancel").onclick=()=>{S.replyTo=null;drawReplyBar();$("#chat-text").focus()}}}
+function startReply(id){const m=S.chat.find(x=>x.id===id);if(!m)return;
+  S.replyTo={id:m.id,uid:m.uid,username:m.username,character:m.character||"",text:m.text.replace(/\s+/g," ").slice(0,100)};drawReplyBar();$("#chat-text").focus()}
+function jumpTo(id){const el=$("#msg-"+id);if(!el){setMsg("chat-msg","err","That message is too old to show here, or it was deleted.");return}
+  el.scrollIntoView({block:"center",behavior:"smooth"});el.classList.remove("flash");void el.offsetWidth;el.classList.add("flash")}
 function chatList(){
   if(S.chatErr)return `<div class="empty">${esc(S.chatErr)}</div>`;
   if(!S.chatReady)return `<div class="empty">Loading messages…</div>`;
@@ -506,15 +556,16 @@ function chatList(){
   for(const m of S.chat){const d=fmtDay(m.ts);if(d!==day){day=d;out+=`<div class="cday">${d}</div>`}
     if(cut!=null&&!lined&&m.ts>cut&&S.me&&m.uid!==S.me.id){lined=true;out+=`<div class="newline" id="chat-new"><span>NEW</span></div>`}
     const mine=S.me&&m.uid===S.me.id,canDel=mine||S.isAdmin;const t=new Date(m.ts);
-    const pinged=!mine&&mentionsMe(m.text);
-    out+=`<div class="cmsg ${mine?"mine":""} ${pinged?"pinged":""}">${canDel?`<button class="btn small danger del" data-delmsg="${m.id}" title="Delete message">✕</button>`:""}<span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${renderMentions(m.text)}</div></div>`}
+    const pinged=!mine&&(mentionsMe(m.text)||(m.replyTo&&S.me&&m.replyTo.uid===S.me.id));
+    const rq=m.replyTo?`<div class="rq" data-jump="${esc(m.replyTo.id)}" title="Jump to the original message"><b>@${esc(m.replyTo.username||"")}</b>${esc(m.replyTo.text||"")}</div>`:"";
+    out+=`<div class="cmsg ${mine?"mine":""} ${pinged?"pinged":""}" id="msg-${m.id}">${rq}<div class="tools"><button type="button" data-reactmsg="${m.id}" title="Add reaction" aria-label="Add reaction">😀</button><button type="button" data-replymsg="${m.id}" title="Reply" aria-label="Reply">↩ Reply</button>${canDel?`<button type="button" class="danger" data-delmsg="${m.id}" title="Delete message" aria-label="Delete message">✕</button>`:""}</div><span class="who">${esc(m.character||m.username)}</span>${m.character?` <span style="color:var(--muted);font-size:12px">@${esc(m.username)}</span>`:""}<span class="when">${pad(t.getHours())}:${pad(t.getMinutes())}</span><div class="txt">${renderMentions(m.text)}</div>${reactsHtml(m)}</div>`}
   return out;
 }
 function viewChat(){
   if(S.chatDivider==null&&chatUnread())S.chatDivider=chatSeen();
   return `<div class="panel chatbox"><h2>FOB Chat</h2>
    <div class="chatlist" id="chat-list" aria-live="polite">${chatList()}</div>
-   <form class="chatform" id="chat-form" autocomplete="off"><textarea id="chat-text" maxlength="1000" placeholder="Message the FOB… (Enter to send, Shift+Enter for a new line)" aria-label="Message"></textarea><button class="btn primary" type="submit">Send</button></form>
+   <form class="chatform" id="chat-form" autocomplete="off">${replyBarHtml()}<div class="chatrow"><button class="btn" type="button" id="chat-emoji" title="Add emoji" aria-label="Add emoji" style="font-size:18px;padding:0 10px">😀</button><textarea id="chat-text" maxlength="1000" placeholder="Message the FOB… (Enter to send, Shift+Enter for a new line, @ to mention)" aria-label="Message"></textarea><button class="btn primary" type="submit">Send</button></div></form>
    <div class="msg" id="chat-msg"></div></div>`;
 }
 function chatAtBottom(el){return el.scrollHeight-el.scrollTop-el.clientHeight<40}
@@ -553,8 +604,10 @@ async function sendChat(){
   const ta=$("#chat-text"),text=ta.value.trim();if(!text)return;
   if(text.length>1000){setMsg("chat-msg","err","Messages can be up to 1000 characters.");return}
   ta.value="";
-  try{await db.collection("chat").add({text,uid:S.me.id,username:S.me.username,character:S.me.character||"",ts:Date.now()});const cl=$("#chat-list");if(cl)cl.scrollTop=cl.scrollHeight;const m=$("#chat-msg");if(m)m.textContent="";delete S.flash["chat-msg"]}
-  catch(e){ta.value=text;setMsg("chat-msg","err",e.code==="permission-denied"?"Chat isn't switched on yet — the admin needs to update the database rules.":errText(e))}
+  const doc={text,uid:S.me.id,username:S.me.username,character:S.me.character||"",ts:Date.now()};
+  const reply=S.replyTo;if(reply)doc.replyTo=reply;S.replyTo=null;drawReplyBar();
+  try{await db.collection("chat").add(doc);const cl=$("#chat-list");if(cl)cl.scrollTop=cl.scrollHeight;const m=$("#chat-msg");if(m)m.textContent="";delete S.flash["chat-msg"]}
+  catch(e){ta.value=text;S.replyTo=reply;drawReplyBar();setMsg("chat-msg","err",e.code==="permission-denied"?"Chat isn't switched on yet — the admin needs to update the database rules.":errText(e))}
 }
 
 /* ---------- Accounts (admin only) ---------- */
@@ -728,7 +781,11 @@ function bindView(v){
         if(ev.key==="ArrowUp"){ev.preventDefault();mbox.hi=(mbox.hi-1+mbox.list.length)%mbox.list.length;drawMentionBox();return}
         if(ev.key==="Enter"||ev.key==="Tab"){ev.preventDefault();insertMention(mbox.list[mbox.hi]);return}
         if(ev.key==="Escape"){ev.preventDefault();ev.stopPropagation();mbox.open=false;drawMentionBox();return}}
+      if(ev.key==="Escape"&&S.replyTo){ev.preventDefault();S.replyTo=null;drawReplyBar();return}
       if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();sendChat()}});
+    $("#chat-emoji").onclick=ev=>{if($("#emoji-pop")){closeEmoji();return}const t=$("#chat-text"),s0=t.selectionStart,e0=t.selectionEnd;
+      openEmoji(ev.currentTarget,e=>{t.value=t.value.slice(0,s0)+e+t.value.slice(e0);const p=s0+e.length;t.focus();t.setSelectionRange(p,p)},"Add emoji to message")};
+    if(S.replyTo)$("#reply-cancel").onclick=()=>{S.replyTo=null;drawReplyBar();$("#chat-text").focus()};
     ta.addEventListener("input",updateMentionBox);
     ta.addEventListener("click",updateMentionBox);
     ta.addEventListener("blur",()=>setTimeout(()=>{mbox.open=false;drawMentionBox()},150));
@@ -768,12 +825,18 @@ document.addEventListener("change",async e=>{
   const upd=t.dataset.mrole?{role:t.value}:{character:t.value.trim()};
   try{await db.collection("members").doc(id).update(upd);setMsg("acc-msg","ok","Saved.")}catch(err){setMsg("acc-msg","err",errText(err))}
 });
+document.addEventListener("click",e=>{
+  const r=e.target.closest("[data-reactmsg]");if(r){if($("#emoji-pop")){closeEmoji();return}const id=r.dataset.reactmsg;openEmoji(r,emo=>toggleReact(id,emo),"React");return}
+  const rp=e.target.closest("[data-replymsg]");if(rp){startReply(rp.dataset.replymsg);return}
+  const tg=e.target.closest("[data-togglereact]");if(tg){toggleReact(tg.dataset.togglereact,edecode(tg.dataset.ek));return}
+  const j=e.target.closest("[data-jump]");if(j){jumpTo(j.dataset.jump);return}
+});
 document.addEventListener("click",async e=>{
   const t=e.target.closest("[data-delmsg]");if(!t)return;
   if(t.dataset.c!=="1"){t.dataset.c="1";t.textContent="Delete?";return}
   t.disabled=true;try{await db.collection("chat").doc(t.dataset.delmsg).delete()}catch(err){t.disabled=false;setMsg("chat-msg","err",errText(err))}
 });
-window.addEventListener("hashchange",()=>{S.flash={};S.chatDivider=null;clearTimeout(chatFadeTimer);chatFadeTimer=null;S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
+window.addEventListener("hashchange",()=>{S.flash={};closeEmoji();S.chatDivider=null;clearTimeout(chatFadeTimer);chatFadeTimer=null;S.f.q="";S.f.cat="";render();window.scrollTo(0,0)});
 
 /* ---------- data ---------- */
 let renderQueued=false;
@@ -797,7 +860,7 @@ function syncDirectory(){if(!S.isAdmin)return;
     if(m.active){if(!d||d.username!==m.username||(d.character||"")!==(m.character||""))db.collection("directory").doc(m.id).set({username:m.username,character:m.character||""}).catch(()=>{})}
     else if(d)db.collection("directory").doc(m.id).delete().catch(()=>{})}
   for(const d of S.dir)if(!S.members.some(m=>m.id===d.id))db.collection("directory").doc(d.id).delete().catch(()=>{})}
-function stopData(){dirSynced=false;unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[];S.chat=[];S.dir=[];S.chatReady=false;S.chatErr="";S._seenInit=false;S.formState=null;S.edit=null;S.flash={};S.chatDivider=null}
+function stopData(){dirSynced=false;unsubs.forEach(u=>{try{u()}catch(_){}});unsubs=[];S.ready={log:false,items:false,stalkers:false,fob:false};S.log=[];S.items=[];S.stalkers=[];S.fob=[];S.members=[];S.chat=[];S.dir=[];S.chatReady=false;S.chatErr="";S._seenInit=false;S.formState=null;S.edit=null;S.flash={};S.chatDivider=null;S.replyTo=null}
 function startData(){
   stopData();
   sub("log",db.collection("log").orderBy("ts","desc").limit(2000));
