@@ -512,6 +512,12 @@ function bindPicker(id,set){
   list.addEventListener("mousemove",ev=>{const o=ev.target.closest(".opt");if(o&&+o.dataset.i!==hi){hi=+o.dataset.i;list.querySelectorAll(".opt").forEach(x=>x.classList.toggle("hi",+x.dataset.i===hi))}});
   el.addEventListener("blur",()=>setTimeout(()=>{if(document.activeElement!==el){close();el.value=cur}},120));
 }
+const pad2=n=>String(n).padStart(2,"0");
+function dmy(d){return `${pad2(d.getDate())}.${pad2(d.getMonth()+1)}.${d.getFullYear()}`}
+function noteStamp(){const d=new Date();return `${dmy(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())} – ${S.me?(S.me.character||S.me.username):""}: `}
+function parseDmy(t){const m=String(t||"").match(/(\d{1,2})\.(\d{1,2})\.(\d{4})/);if(!m)return 0;const d=new Date(+m[3],+m[2]-1,+m[1]);return isNaN(d)?0:d.getTime()}
+function latestSeen(lastSeen,notes){let best=parseDmy(lastSeen),bestTxt=lastSeen||"";const re=/(\d{1,2})\.(\d{1,2})\.(\d{4})/g;let m;
+  while((m=re.exec(notes||""))){const t=new Date(+m[3],+m[2]-1,+m[1]).getTime();if(t>best&&t<=Date.now()+864e5){best=t;bestTxt=dmy(new Date(t))}}return bestTxt}
 const openNotes=new Set();
 function notesCell(t){if(!t)return "";const k=String(t).length+":"+String(t).slice(0,40);return `<div class="clamp${openNotes.has(k)?" open":""}" data-nk="${esc(k)}">${esc(t)}</div>`}
 function markClamps(root){(root||document).querySelectorAll(".clamp:not([data-done])").forEach(c=>{c.dataset.done="1";
@@ -536,7 +542,10 @@ function viewProfile(){
   return `<div class="panel"><div class="row"><label for="pick" style="color:var(--muted)">Select stalker</label>
     ${pickerHtml("pick",names,S.profile,"Type a name to search…")}</div></div>
   <div class="profile">
-   <div class="panel"><h2>Info</h2><dl class="info">${STALKER_FIELDS.filter(f=>f[0]!=="name").map(f=>`<dt>${f[1]}</dt><dd>${f[0]==="status"&&p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:f[0]==="notes"&&p.notes?notesCell(p.notes):esc(p[f[0]])||'<span style="color:#5f6153">—</span>'}</dd>`).join("")}</dl></div>
+   <div class="panel"><h2>Info</h2><dl class="info">${STALKER_FIELDS.filter(f=>f[0]!=="name").map(f=>`<dt>${f[1]}</dt><dd>${f[0]==="status"&&p.status?`<span class="chip st-${esc(p.status)}">${esc(p.status)}</span>`:f[0]==="notes"&&p.notes?notesCell(p.notes):esc(p[f[0]])||'<span style="color:#5f6153">—</span>'}</dd>`).join("")}</dl>
+    ${S.canWrite&&p.id?`<form id="note-form" style="margin-top:12px" autocomplete="off"><label for="note-text" style="display:block;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Add note</label>
+      <textarea id="note-text" placeholder="What happened? Date, time and your name are added automatically." style="min-height:56px"></textarea>
+      <div class="row" style="margin-top:6px"><button class="btn primary small" type="submit">Add note</button><span class="msg" id="note-msg" style="margin:0"></span></div></form>`:""}</div>
    <div class="panel"><h2>Totals</h2><dl class="info">
      <dt>Rubles paid to them</dt><dd class="num">${fmtN(rubOut)}</dd><dt>Rubles they paid us</dt><dd>${fmtN(rubIn)}</dd>
      <dt>Items they brought in</dt><dd>${fmtN(itIn)}</dd><dt>Items given to them</dt><dd>${fmtN(itOut)}</dd><dt>Log entries</dt><dd>${rows.length}</dd></dl></div>
@@ -806,15 +815,17 @@ function openItemModal(id,prefill){
 function openPersonModal(kind,id){
   const list=kind==="fob"?S.fob:S.stalkers,fields=kind==="fob"?FOB_FIELDS:STALKER_FIELDS,rec=id?list.find(p=>p.id===id):null;
   openModal(`<form id="m-form"><h2>${rec?"Edit":"Add"} ${kind==="fob"?"FOB member":"stalker"}</h2><div class="grid">
-  ${fields.map(([k,l,lk,wide])=>`<div class="field ${wide?"wide":""}"><label for="m-${k}">${l}</label>${lk?`<select id="m-${k}">${opts(L(lk),rec?.[k]||"","—")}</select>`:wide?`<textarea id="m-${k}">${esc(rec?.[k])}</textarea>`:`<input id="m-${k}" value="${esc(rec?.[k])}" ${k==="name"?"required":""}>`}</div>`).join("")}
+  ${fields.map(([k,l,lk,wide])=>`<div class="field ${wide?"wide":""}"><label for="m-${k}">${l}</label>${lk?`<select id="m-${k}">${opts(L(lk),rec?.[k]||"","—")}</select>`:wide?`<textarea id="m-${k}">${esc(rec?.[k])}</textarea>${k==="notes"?`<button class="btn small" type="button" id="m-addnote" style="margin-top:6px">+ Add dated note</button>`:""}`:`<input id="m-${k}" value="${esc(rec?.[k])}" ${k==="name"?"required":""}>`}</div>`).join("")}
   ${photoField(rec)}</div>
   <div class="row" style="margin-top:12px"><button class="btn primary" type="submit">Save</button><button class="btn" type="button" id="m-cancel">Cancel</button>${rec?`<button class="btn danger" type="button" id="m-del">Delete</button>`:""}</div><div class="msg" id="m-msg"></div></form>`);
   $("#m-cancel").onclick=closeModal;
+  $("#m-addnote")&&($("#m-addnote").onclick=()=>{const ta=$("#m-notes");ta.value=ta.value.replace(/\s+$/,"")+(ta.value.trim()?"\n":"")+noteStamp();ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);ta.scrollTop=ta.scrollHeight});
   $("#m-del")&&($("#m-del").onclick=async()=>{const b=$("#m-del");if(b.dataset.c!=="1"){b.dataset.c="1";b.textContent="Click again to delete";return}
     try{await db.collection(kind).doc(rec.id).delete();closeModal()}catch(e){$("#m-msg").className="msg err";$("#m-msg").textContent=errText(e)}});
   $("#m-form").onsubmit=async ev=>{ev.preventDefault();const msg=$("#m-msg"),data={};
     for(const [k] of fields)data[k]=$("#m-"+k).value.trim();
     if(!data.name){msg.className="msg err";msg.textContent="A name is required.";return}
+    if("lastSeen" in data&&"notes" in data)data.lastSeen=latestSeen(data.lastSeen,data.notes);
     $("#m-form").querySelectorAll("button").forEach(b=>b.disabled=true);msg.className="msg";msg.textContent="Saving…";
     try{await handlePhoto(rec,data);if(rec)await db.collection(kind).doc(rec.id).set(data);else await db.collection(kind).add(data);closeModal()}
     catch(e){$("#m-form").querySelectorAll("button").forEach(b=>b.disabled=false);msg.className="msg err";msg.textContent=errText(e)}};
@@ -828,6 +839,12 @@ function bindView(v){
   $("#f-cat")&&($("#f-cat").onchange=e=>{S.f.cat=e.target.value;render()});
   $("#f-only")&&($("#f-only").onchange=e=>{S.f.onlyStock=e.target.checked;render()});
   bindPicker("pick",v=>{S.profile=v});
+  if($("#note-form")){$("#note-form").onsubmit=async ev=>{ev.preventDefault();const t=$("#note-text").value.trim();if(!t)return;
+    const p=S.stalkers.find(x=>x.name===S.profile);if(!p)return;const line=noteStamp()+t.replace(/\s*\n\s*/g," ");
+    const notes=(p.notes||"").replace(/\s+$/,"")+((p.notes||"").trim()?"\n":"")+line,last=latestSeen(p.lastSeen,line);
+    const b=$("#note-form button");b.disabled=true;
+    try{await db.collection("stalkers").doc(p.id).update({notes,lastSeen:last});$("#note-text").value="";if(document.activeElement)document.activeElement.blur();render();setMsg("note-msg","ok","Added. Last seen set to "+last+".")}
+    catch(e){setMsg("note-msg","err",errText(e))}b.disabled=false}}
   bindPicker("pick-item",v=>{S.itemSel=v});
   const form=$("#entry");
   if(form){form.onsubmit=ev=>{ev.preventDefault();saveEntry()};
@@ -922,7 +939,7 @@ let renderQueued=false;
 function queueRender(){if(renderQueued)return;renderQueued=true;requestAnimationFrame(()=>{renderQueued=false;
   const a=document.activeElement;
   if(route()==="chat"&&$("#chat-list")){renderTabs();renderKpis();refreshChat();return}
-  if(a&&a.closest&&(a.closest("#modal")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar))){renderKpis();return}
+  if(a&&a.closest&&(a.closest("#modal")||a.closest("#note-form")||a.closest("#lists-form")||a.closest("#acc-new")||a.closest("#imp")||(a.dataset&&a.dataset.mchar))){renderKpis();return}
   if(a&&a.closest&&a.closest("#entry")&&route()==="log"){renderKpis();const {out,m}=logRows();const ls=$("#list-slot");if(ls){ls.innerHTML=logList(out,m);bindView("log-list");markClamps(ls)}return}
   render()})}
 function sub(name,query){
